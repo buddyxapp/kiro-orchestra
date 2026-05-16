@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>Kiro Orchestra</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3; height: 100vh; display: flex; }
+.sidebar { width: 250px; background: #19171d; border-right: 1px solid #333; display: flex; flex-direction: column; }
+.sidebar h1 { padding: 14px 16px; font-size: 15px; color: #fff; border-bottom: 1px solid #333; }
+.channels { flex: 1; overflow-y: auto; padding: 8px 0; }
+.channel { padding: 6px 16px; cursor: pointer; font-size: 13px; border-radius: 4px; margin: 1px 8px; display: flex; align-items: center; gap: 8px; }
+.channel:hover { background: #27242c; }
+.channel.active { background: #1164a3; color: #fff; }
+.cancel-btn { margin-left: auto; font-size: 12px; opacity: 0.7; cursor: pointer; padding: 2px 4px; border-radius: 3px; }
+.cancel-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot.idle { background: #2bac76; }
+.dot.working { background: #f2c744; animation: pulse 1s infinite; }
+.dot.starting { background: #f2c744; animation: pulse 0.5s infinite; }
+.dot.stopped { background: #555; }
+@keyframes pulse { 50% { opacity: 0.4; } }
+.sidebar-btn { margin: 8px; padding: 8px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #ccc; cursor: pointer; font-size: 12px; text-align: center; }
+.sidebar-btn:hover { background: #333; }
+.main { flex: 1; display: flex; flex-direction: column; position: relative; }
+.header { padding: 10px 20px; border-bottom: 1px solid #333; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+.header button { background: #333; border: 1px solid #555; color: #ccc; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.messages { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.msg { margin-bottom: 10px; }
+.msg .author { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
+.msg .author.user { color: #4fc3f7; }
+.msg .author.master { color: #f2c744; }
+.msg .author.worker { color: #2bac76; }
+.msg .text { font-size: 13px; white-space: pre-wrap; line-height: 1.5; }
+.msg .tool { font-size: 11px; color: #999; padding: 3px 8px; background: #2a2a2a; border-radius: 4px; margin: 3px 0; display: inline-block; }
+.msg .tool.completed { border-left: 3px solid #2bac76; }
+.msg .tool.failed { border-left: 3px solid #e74c3c; }
+.msg .thinking { font-size: 11px; color: #888; font-style: italic; }
+.msg .divider { border-bottom: 1px solid #333; margin: 8px 0; }
+/* Input area */
+.input-area { padding: 10px 20px; border-top: 1px solid #333; position: relative; }
+.input-area form { display: flex; gap: 8px; }
+.input-area input { flex: 1; background: #222529; border: 1px solid #444; border-radius: 6px; padding: 10px 14px; color: #fff; font-size: 13px; outline: none; }
+.input-area input:focus { border-color: #1164a3; }
+.input-area button { background: #1164a3; color: #fff; border: none; border-radius: 6px; padding: 10px 14px; cursor: pointer; font-size: 13px; }
+/* @mention popup */
+.mention-popup { display: none; position: absolute; bottom: 100%; left: 20px; right: 20px; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; padding: 6px 0; margin-bottom: 4px; max-height: 200px; overflow-y: auto; z-index: 10; }
+.mention-popup.show { display: block; }
+.mention-item { padding: 6px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.mention-item:hover, .mention-item.selected { background: #1164a3; color: #fff; }
+.mention-item .role-tag { font-size: 10px; background: #444; padding: 1px 5px; border-radius: 3px; color: #aaa; }
+/* Settings */
+.settings { display: none; flex: 1; flex-direction: column; padding: 20px; overflow-y: auto; }
+.settings.show { display: flex; }
+.settings h2 { color: #fff; margin-bottom: 16px; font-size: 16px; }
+.agent-card { background: #222; border: 1px solid #333; border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+.agent-card label { font-size: 11px; color: #888; display: block; margin-bottom: 3px; }
+.agent-card input, .agent-card textarea { width: 100%; background: #1a1d21; border: 1px solid #444; border-radius: 4px; padding: 6px 10px; color: #fff; font-size: 12px; margin-bottom: 8px; outline: none; font-family: inherit; }
+.agent-card textarea { height: 50px; resize: vertical; }
+.agent-card .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.agent-card .actions button { padding: 5px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 11px; }
+.agent-card .actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-start { background: #2bac76; color: #fff; }
+.btn-stop { background: #e74c3c; color: #fff; }
+.btn-remove { background: #555; color: #ccc; }
+.btn-save { background: #1164a3; color: #fff; }
+.btn-add { background: #1164a3; color: #fff; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; margin-top: 8px; }
+.btn-startall { background: #2bac76; color: #fff; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; margin-top: 4px; }
+.status-badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 3px; margin-left: 6px; }
+.status-badge.stopped { background: #555; color: #aaa; }
+.status-badge.starting { background: #f2c744; color: #000; animation: pulse 0.5s infinite; }
+.status-badge.idle { background: #2bac76; color: #fff; }
+.status-badge.working { background: #f2c744; color: #000; }
+.error-toast { position: fixed; top: 16px; right: 16px; background: #e74c3c; color: #fff; padding: 10px 16px; border-radius: 6px; font-size: 13px; z-index: 999; display: none; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h1>🎼 Kiro Orchestra</h1>
+  <div class="channels" id="channels"></div>
+  <div class="sidebar-btn" id="btn-settings">⚙️ Agent 設定</div>
+</div>
+
+<div class="main">
+  <div class="header">
+    <span id="header-title"># all</span>
+    <button id="btn-toggle-view">⚙️ 設定</button>
+  </div>
+
+  <div class="messages" id="messages"></div>
+  <div class="input-area" id="input-area">
+    <div class="mention-popup" id="mention-popup"></div>
+    <form id="form">
+      <input id="input" placeholder="輸入訊息... 打 @ 選擇要對話的 agent" autocomplete="off" />
+      <button type="submit">送出</button>
+    </form>
+  </div>
+
+  <div class="settings" id="settings">
+    <h2>⚙️ Agent 設定</h2>
+    <div id="agent-cards"></div>
+    <button class="btn-add" id="btn-add-agent">+ 新增 Worker</button>
+    <button class="btn-startall" id="btn-start-all">🚀 全部啟動</button>
+  </div>
+</div>
+
+<div class="error-toast" id="error-toast"></div>
+
+<script>
+const messagesEl = document.getElementById('messages');
+const channelsEl = document.getElementById('channels');
+const headerTitle = document.getElementById('header-title');
+const settingsEl = document.getElementById('settings');
+const inputArea = document.getElementById('input-area');
+const agentCards = document.getElementById('agent-cards');
+const form = document.getElementById('form');
+const input = document.getElementById('input');
+const errorToast = document.getElementById('error-toast');
+const mentionPopup = document.getElementById('mention-popup');
+
+let ws, sessions = [], activeChannel = 'all', showSettings = false;
+const logs = { all: [] };
+let workerCounter = 5;
+let mentionIdx = -1;
+// Track current streaming message per agent
+const streaming = {}; // agentId -> { el: DOM element, text: '' }
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}`);
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'sessions') { sessions = msg.sessions; renderChannels(); if (showSettings) renderSettings(); }
+    else if (msg.type === 'agent_event') handleEvent(msg.agentId, msg.event);
+    else if (msg.type === 'error') showError(msg.message);
+  };
+  ws.onclose = () => setTimeout(connect, 2000);
+}
+
+function handleEvent(agentId, event) {
+  if (!logs[agentId]) logs[agentId] = [];
+
+  if (event.type === 'text') {
+    // User messages are always standalone (not streamed)
+    if (agentId === 'user') {
+      const entry = { agentId, event };
+      logs.all.push(entry);
+      logs[agentId] = logs[agentId] || [];
+      logs[agentId].push(entry);
+    } else {
+      // Agent streaming: accumulate chunks into one message
+      if (!streaming[agentId]) {
+        const entry = { agentId, event: { type: 'text', content: event.content } };
+        logs.all.push(entry);
+        logs[agentId].push(entry);
+        streaming[agentId] = entry;
+      } else {
+        streaming[agentId].event.content += event.content;
+      }
+    }
+  } else {
+    if (event.type === 'turn_end') streaming[agentId] = null;
+    const entry = { agentId, event };
+    logs.all.push(entry);
+    logs[agentId].push(entry);
+  }
+
+  if (!showSettings && (activeChannel === 'all' || activeChannel === agentId)) renderMessages();
+}
+
+function renderChannels() {
+  let html = `<div class="channel ${activeChannel === 'all' ? 'active' : ''}" data-id="all"># all</div>`;
+  for (const s of sessions) {
+    const cls = activeChannel === s.id ? 'active' : '';
+    const cancelBtn = s.status === 'working' ? `<span class="cancel-btn" data-cancel="${s.id}" title="取消任務">⏸</span>` : '';
+    html += `<div class="channel ${cls}" data-id="${s.id}"><span class="dot ${s.status}"></span>${s.name}${cancelBtn}</div>`;
+  }
+  channelsEl.innerHTML = html;
+  channelsEl.querySelectorAll('.channel').forEach(el => {
+    el.onclick = (e) => { if (e.target.classList?.contains('cancel-btn')) return; activeChannel = el.dataset.id; showSettings = false; toggleView(); renderChannels(); renderMessages(); headerTitle.textContent = `# ${activeChannel}`; };
+  });
+  channelsEl.querySelectorAll('.cancel-btn').forEach(el => {
+    el.onclick = (e) => { e.stopPropagation(); cancelAgent(el.dataset.cancel); };
+  });
+}
+
+function renderMessages() {
+  const entries = logs[activeChannel] || [];
+  let html = '';
+  const seen = new Set();
+  for (const entry of entries) {
+    // Deduplicate: streaming entries are mutated in place, skip if already rendered same object
+    if (entry.event.type === 'text') {
+      if (seen.has(entry)) continue;
+      seen.add(entry);
+    }
+    const { agentId, event } = entry;
+    const s = sessions.find(x => x.id === agentId);
+    const label = s ? s.name : agentId;
+    const role = agentId === 'user' ? 'user' : (s?.role === 'master' ? 'master' : 'worker');
+    if (event.type === 'text') html += `<div class="msg"><div class="author ${role}">${esc(label)}</div><div class="text">${esc(event.content)}</div></div>`;
+    else if (event.type === 'tool_start') html += `<div class="msg"><div class="tool">🔧 ${esc(event.title)}</div></div>`;
+    else if (event.type === 'tool_done') html += `<div class="msg"><div class="tool ${event.status}">✓ ${esc(event.title)}</div></div>`;
+    else if (event.type === 'thinking') {} // skip thinking noise
+    else if (event.type === 'turn_end') html += `<div class="msg"><div class="divider"></div></div>`;
+  }
+  messagesEl.innerHTML = html;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function renderSettings() {
+  let html = '';
+  for (const s of sessions) {
+    html += `<div class="agent-card" data-id="${s.id}">
+      <label>${s.role === 'master' ? '👑 Master' : '👷 Worker'} <span class="status-badge ${s.status}">${s.status}</span></label>
+      <label>名字</label><input class="cfg-name" value="${esc(s.name)}" />
+      <label>個性 (System Prompt)</label><textarea class="cfg-persona">${esc(s.persona)}</textarea>
+      <div class="actions">
+        <button class="btn-save" onclick="saveAgent('${s.id}', this)">💾 儲存</button>
+        ${s.status === 'stopped' ? `<button class="btn-start" onclick="startAgent('${s.id}', this)">▶ 啟動</button>` : s.status === 'starting' ? `<button class="btn-start" disabled>⏳ 啟動中...</button>` : `<button class="btn-stop" onclick="stopAgent('${s.id}')">⏹ 停止</button>`}
+        ${s.status === 'working' ? `<button class="btn-stop" style="background:#f2c744;color:#000" onclick="cancelAgent('${s.id}')">⏸️ 取消任務</button>` : ''}
+        ${s.role === 'worker' ? `<button class="btn-remove" onclick="removeAgent('${s.id}')">🗑 移除</button>` : ''}
+      </div>
+    </div>`;
+  }
+  agentCards.innerHTML = html;
+}
+
+function toggleView() {
+  settingsEl.classList.toggle('show', showSettings);
+  messagesEl.style.display = showSettings ? 'none' : 'block';
+  inputArea.style.display = showSettings ? 'none' : 'block';
+}
+
+function showError(msg) { errorToast.textContent = msg; errorToast.style.display = 'block'; setTimeout(() => errorToast.style.display = 'none', 4000); }
+function send(msg) { if (ws?.readyState === 1) ws.send(JSON.stringify(msg)); }
+
+function saveAgent(id, btn) {
+  const card = btn.closest('.agent-card');
+  const name = card.querySelector('.cfg-name').value.trim();
+  const persona = card.querySelector('.cfg-persona').value.trim();
+  send({ type: 'update_agent', id, name, persona });
+  btn.textContent = '✅ 已儲存'; setTimeout(() => btn.textContent = '💾 儲存', 1500);
+}
+
+function startAgent(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 啟動中...'; }
+  send({ type: 'start_agent', id });
+}
+function stopAgent(id) { send({ type: 'stop_agent', id }); }
+function cancelAgent(id) { send({ type: 'cancel_agent', id }); }
+function removeAgent(id) { send({ type: 'remove_agent', id }); }
+
+// --- @mention autocomplete ---
+input.addEventListener('input', () => {
+  const val = input.value;
+  const atIdx = val.lastIndexOf('@');
+  if (atIdx === -1 || (atIdx > 0 && val[atIdx - 1] !== ' ')) { mentionPopup.classList.remove('show'); return; }
+  const query = val.slice(atIdx + 1).toLowerCase();
+  const running = sessions.filter(s => s.status === 'idle' || s.status === 'working');
+  const matches = [{ id: 'all', name: '全部 (廣播)', role: 'all' }, ...running].filter(s => s.name.toLowerCase().includes(query) || s.id.includes(query));
+  if (!matches.length) { mentionPopup.classList.remove('show'); return; }
+  mentionIdx = 0;
+  renderMentions(matches);
+  mentionPopup.classList.add('show');
+});
+
+input.addEventListener('keydown', (e) => {
+  if (!mentionPopup.classList.contains('show')) return;
+  const items = mentionPopup.querySelectorAll('.mention-item');
+  if (e.key === 'ArrowDown') { e.preventDefault(); mentionIdx = (mentionIdx + 1) % items.length; highlightMention(items); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); mentionIdx = (mentionIdx - 1 + items.length) % items.length; highlightMention(items); }
+  else if (e.key === 'Enter' && mentionIdx >= 0) { e.preventDefault(); selectMention(items[mentionIdx].dataset.name); }
+  else if (e.key === 'Escape') { mentionPopup.classList.remove('show'); }
+});
+
+function renderMentions(matches) {
+  mentionPopup.innerHTML = matches.map((m, i) =>
+    `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-id="${m.id}" data-name="${esc(m.name)}"><span class="role-tag">${m.role}</span> ${esc(m.name)} <span style="color:#666;font-size:11px">(${m.id})</span></div>`
+  ).join('');
+  mentionPopup.querySelectorAll('.mention-item').forEach(el => { el.onclick = () => selectMention(el.dataset.name); });
+}
+
+function highlightMention(items) { items.forEach((el, i) => el.classList.toggle('selected', i === mentionIdx)); }
+
+function selectMention(name) {
+  const val = input.value;
+  const atIdx = val.lastIndexOf('@');
+  input.value = val.slice(0, atIdx) + `@${name} `;
+  mentionPopup.classList.remove('show');
+  input.focus();
+}
+
+document.getElementById('btn-settings').onclick = document.getElementById('btn-toggle-view').onclick = () => { showSettings = !showSettings; toggleView(); if (showSettings) renderSettings(); };
+document.getElementById('btn-add-agent').onclick = () => { send({ type: 'add_agent', config: { id: `worker-${workerCounter++}`, name: '新 Worker', role: 'worker', persona: '' } }); };
+document.getElementById('btn-start-all').onclick = () => send({ type: 'start_all' });
+
+form.onsubmit = (e) => { e.preventDefault(); const t = input.value.trim(); if (t) { send({ type: 'user_message', content: t }); input.value = ''; mentionPopup.classList.remove('show'); } };
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+connect();
+</script>
+</body>
+</html>
