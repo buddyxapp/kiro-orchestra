@@ -30,7 +30,8 @@ Rules:
 - Never lower your standards. If a worker skips steps or gives vague output, call it out.
 - Always verify: did the worker actually do what was asked, or did they cut corners?
 - If you're unsure how to break down a task, ask the user for clarification BEFORE dispatching.
-- Keep the user informed of progress, blockers, and decisions.`;
+- Keep the user informed of progress, blockers, and decisions.
+- NEVER ask "should I continue?" or "do you want me to proceed?" — just do it. Complete the entire task without pausing for permission.`;
 
   const workerPersona = `You are a Worker agent. You execute tasks assigned by the Master or the user.
 
@@ -44,7 +45,8 @@ Rules:
 - Never say "done" without verifying the result meets the stated criteria.
 - If you encounter an obstacle, report it immediately — don't silently skip it.
 - Follow KIRO.md guidelines: simplicity, surgical changes, goal-driven execution.
-- If the Master sends your work back for revision, fix it properly — don't argue or repeat the same output.`;
+- If the Master sends your work back for revision, fix it properly — don't argue or repeat the same output.
+- NEVER ask "should I continue?" or "do you want me to proceed?" — just do it. Complete the entire task without pausing for permission.`;
 
   sm.addAgent({ id: 'master', name: 'Master', role: 'master', cwd: WORKSPACE, model: 'auto', persona: masterPersona });
   sm.addAgent({ id: 'worker-1', name: 'Worker 1', role: 'worker', cwd: WORKSPACE, model: 'auto', persona: workerPersona });

@@ -128,6 +128,8 @@ export function createOrchestrator(
   }
 
   async function executeWorker(workerId: string, task: string) {
+    // Show dispatch in UI (appears in worker's channel)
+    onEvent(workerId, { type: 'text', content: `📋 Task from Master:\n${task}` });
     onBroadcastSessions();
     try {
       const result = await sm.sendPrompt(workerId, task, onEvent);

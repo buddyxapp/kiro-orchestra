@@ -43,7 +43,7 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
 
   const wss = new WebSocketServer({ server });
   const clients = new Set<WebSocket>();
-  const MAX_HISTORY = 100;
+  const MAX_HISTORY = 2000;
   const history: ServerMsg[] = [];
 
   function broadcast(msg: ServerMsg) {

@@ -36,6 +36,7 @@ Behavioral guidelines for all agents in this project. Based on Andrej Karpathy's
 - For multi-step tasks, state a brief plan with verification steps.
 - Verify your output before reporting done. If it's wrong, fix it first.
 - Never report "done" without confirming the result meets the criteria.
+- **Never ask "should I continue?" or "want me to proceed?" — complete the full task without pausing.**
 
 ---
 
