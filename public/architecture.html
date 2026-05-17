@@ -73,7 +73,7 @@ code { background: #161b22; padding: 2px 6px; border-radius: 4px; color: #79c0ff
   <div class="layer layer-browser">
     <div class="layer-title">BROWSER</div>
     <div class="row">
-      <div class="box ui"><div class="box-title">Slack-like UI</div><div class="box-desc">Channels • Chat • @mention<br>Settings • Model selector</div></div>
+      <div class="box ui"><div class="box-title">Slack-like UI</div><div class="box-desc">Sidebar • Chat • Activity Panel<br>@mention • Settings • Image paste</div></div>
     </div>
     <div class="box-desc" style="text-align:center;margin-top:8px;color:#58a6ff;">http://localhost:3000</div>
   </div>
@@ -139,6 +139,8 @@ code { background: #161b22; padding: 2px 6px; border-radius: 4px; color: #79c0ff
   <div class="feature"><div class="feature-icon">🤖</div><div class="feature-title">Model Selection</div><div class="feature-desc">Each agent can use a different AI model (Opus, Sonnet, Haiku, etc.)</div></div>
   <div class="feature"><div class="feature-icon">⏸️</div><div class="feature-title">Cancel Anytime</div><div class="feature-desc">Stop individual agents or interrupt everything with one click</div></div>
   <div class="feature"><div class="feature-icon">🔌</div><div class="feature-title">Full MCP Access</div><div class="feature-desc">Every agent has Salesforce, Outlook, AWS CLI, and all configured tools</div></div>
+  <div class="feature"><div class="feature-icon">📷</div><div class="feature-title">Image Paste</div><div class="feature-desc">Ctrl+V screenshots directly into chat. Agents analyze via read tool.</div></div>
+  <div class="feature"><div class="feature-icon">📊</div><div class="feature-title">Activity Panel</div><div class="feature-desc">Right-side panel shows real-time tool calls per agent. Chat stays clean.</div></div>
   <div class="feature"><div class="feature-icon">🏠</div><div class="feature-title">100% Local</div><div class="feature-desc">Runs on localhost. No external services. No API keys beyond kiro-cli.</div></div>
 </div>
 
@@ -152,6 +154,7 @@ code { background: #161b22; padding: 2px 6px; border-radius: 4px; color: #79c0ff
 <tr><td>Cancel one agent</td><td>Click ⏸ next to it in sidebar</td></tr>
 <tr><td>Change model</td><td>Settings → dropdown (restarts agent)</td></tr>
 <tr><td>Change working dir</td><td>Settings → cwd field → Save</td></tr>
+<tr><td>Paste image</td><td>Ctrl+V or 📎 button — agent reads the saved file</td></tr>
 </table>
 
 <h2>Quick Start</h2>
