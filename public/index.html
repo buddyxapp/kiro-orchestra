@@ -351,7 +351,7 @@ form.onsubmit = (e) => {
 };
 
 document.getElementById('btn-settings').onclick = () => { showSettings = !showSettings; toggleView(); if (showSettings) renderSettings(); };
-document.getElementById('btn-add-agent').onclick = () => { send({ type: 'add_agent', config: { id: `worker-${workerCounter++}`, name: `Worker ${workerCounter-1}`, role: 'worker', cwd: sessions[0]?.cwd || '', persona: '' } }); };
+document.getElementById('btn-add-agent').onclick = () => { const defaultPersona = 'You are a work assistant. Follow commands from the Master and the user. You have a wiki directory to accumulate knowledge — save useful info as .md files.'; send({ type: 'add_agent', config: { id: `worker-${workerCounter++}`, name: `Worker ${workerCounter-1}`, role: 'worker', cwd: sessions[0]?.cwd || '', model: 'auto', persona: defaultPersona } }); };
 document.getElementById('btn-start-all').onclick = () => send({ type: 'start_all' });
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
