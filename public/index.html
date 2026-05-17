@@ -6,7 +6,7 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3; height: 100vh; display: flex; }
-.sidebar { width: 250px; background: #19171d; border-right: 1px solid #333; display: flex; flex-direction: column; }
+.sidebar { width: 220px; background: #19171d; border-right: 1px solid #333; display: flex; flex-direction: column; flex-shrink: 0; }
 .sidebar h1 { padding: 14px 16px; font-size: 15px; color: #fff; border-bottom: 1px solid #333; }
 .channels { flex: 1; overflow-y: auto; padding: 8px 0; }
 .channel { padding: 6px 16px; cursor: pointer; font-size: 13px; border-radius: 4px; margin: 1px 8px; display: flex; align-items: center; gap: 8px; }
@@ -22,9 +22,8 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 @keyframes pulse { 50% { opacity: 0.4; } }
 .sidebar-btn { margin: 8px; padding: 8px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #ccc; cursor: pointer; font-size: 12px; text-align: center; }
 .sidebar-btn:hover { background: #333; }
-.main { flex: 1; display: flex; flex-direction: column; position: relative; }
-.header { padding: 10px 20px; border-bottom: 1px solid #333; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
-.header button { background: #333; border: 1px solid #555; color: #ccc; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.header { padding: 10px 20px; border-bottom: 1px solid #333; font-weight: bold; font-size: 14px; }
 .messages { flex: 1; overflow-y: auto; padding: 16px 20px; }
 .msg { margin-bottom: 10px; }
 .msg .author { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
@@ -32,9 +31,6 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 .msg .author.master { color: #f2c744; }
 .msg .author.worker { color: #2bac76; }
 .msg .text { font-size: 13px; white-space: pre-wrap; line-height: 1.5; }
-.msg .tool { font-size: 11px; color: #999; padding: 3px 8px; background: #2a2a2a; border-radius: 4px; margin: 3px 0; display: inline-block; }
-.msg .tool.completed { border-left: 3px solid #2bac76; }
-.msg .tool.failed { border-left: 3px solid #e74c3c; }
 .msg .divider { border-bottom: 1px solid #333; margin: 8px 0; }
 .input-area { padding: 10px 20px; border-top: 1px solid #333; position: relative; }
 .input-area .target-hint { font-size: 11px; color: #888; margin-bottom: 4px; }
@@ -44,13 +40,25 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 .input-area button { background: #1164a3; color: #fff; border: none; border-radius: 6px; padding: 10px 14px; cursor: pointer; font-size: 13px; }
 .img-btn { cursor: pointer; font-size: 18px; display: flex; align-items: center; padding: 0 4px; }
 .image-preview { margin-bottom: 6px; }
-.image-preview img { max-height: 100px; border-radius: 6px; border: 1px solid #444; }
+.image-preview img { max-height: 80px; border-radius: 6px; border: 1px solid #444; }
 .image-preview .remove-img { cursor: pointer; margin-left: 6px; color: #ff7b72; font-size: 12px; }
 .mention-popup { display: none; position: absolute; bottom: 100%; left: 20px; right: 20px; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; padding: 6px 0; margin-bottom: 4px; max-height: 200px; overflow-y: auto; z-index: 10; }
 .mention-popup.show { display: block; }
 .mention-item { padding: 6px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .mention-item:hover, .mention-item.selected { background: #1164a3; color: #fff; }
 .mention-item .role-tag { font-size: 10px; background: #444; padding: 1px 5px; border-radius: 3px; color: #aaa; }
+/* Right panel — Activity */
+.activity-panel { width: 260px; background: #13151a; border-left: 1px solid #333; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+.activity-panel h2 { padding: 10px 14px; font-size: 12px; color: #8b949e; border-bottom: 1px solid #333; letter-spacing: 0.5px; text-transform: uppercase; }
+.activity-agent { border-bottom: 1px solid #222; padding: 8px 14px; }
+.activity-agent-name { font-size: 11px; font-weight: bold; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+.activity-agent-name .dot { width: 6px; height: 6px; }
+.activity-item { font-size: 11px; padding: 2px 0 2px 14px; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.activity-item.running { color: #f2c744; }
+.activity-item.completed { color: #3fb950; }
+.activity-item.failed { color: #f85149; }
+.activity-idle { font-size: 11px; color: #555; padding-left: 14px; }
+/* Settings */
 .settings { display: none; flex: 1; flex-direction: column; padding: 20px; overflow-y: auto; }
 .settings.show { display: flex; }
 .settings h2 { color: #fff; margin-bottom: 16px; font-size: 16px; }
@@ -60,7 +68,6 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 .agent-card textarea { height: 50px; resize: vertical; }
 .agent-card .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .agent-card .actions button { padding: 5px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 11px; }
-.agent-card .actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-start { background: #2bac76; color: #fff; }
 .btn-stop { background: #e74c3c; color: #fff; }
 .btn-remove { background: #555; color: #ccc; }
@@ -69,7 +76,7 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 .btn-startall { background: #2bac76; color: #fff; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; width: 100%; margin-top: 4px; }
 .status-badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 3px; margin-left: 6px; }
 .status-badge.stopped { background: #555; color: #aaa; }
-.status-badge.starting { background: #f2c744; color: #000; animation: pulse 0.5s infinite; }
+.status-badge.starting { background: #f2c744; color: #000; }
 .status-badge.idle { background: #2bac76; color: #fff; }
 .status-badge.working { background: #f2c744; color: #000; }
 .error-toast { position: fixed; top: 16px; right: 16px; background: #e74c3c; color: #fff; padding: 10px 16px; border-radius: 6px; font-size: 13px; z-index: 999; display: none; }
@@ -84,11 +91,7 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 </div>
 
 <div class="main">
-  <div class="header">
-    <span id="header-title"># all</span>
-    <button id="btn-toggle-view">⚙️ Settings</button>
-  </div>
-
+  <div class="header"><span id="header-title"># all</span></div>
   <div class="messages" id="messages"></div>
   <div class="input-area" id="input-area">
     <div class="target-hint" id="target-hint">Sending to: Master (use @ to pick agent)</div>
@@ -96,17 +99,21 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
     <div class="image-preview" id="image-preview"></div>
     <form id="form">
       <input id="input" placeholder="Type a message... (Ctrl+V to paste image)" autocomplete="off" />
-      <label class="img-btn" title="Paste image from clipboard">📎<input type="file" id="file-input" accept="image/*" style="display:none"></label>
+      <label class="img-btn" title="Attach image">📎<input type="file" id="file-input" accept="image/*" style="display:none"></label>
       <button type="submit">Send</button>
     </form>
   </div>
-
   <div class="settings" id="settings">
     <h2>⚙️ Agent Settings</h2>
     <div id="agent-cards"></div>
     <button class="btn-add" id="btn-add-agent">+ Add Worker</button>
     <button class="btn-startall" id="btn-start-all">🚀 Start All</button>
   </div>
+</div>
+
+<div class="activity-panel" id="activity-panel">
+  <h2>🔧 Activity</h2>
+  <div id="activity-content"></div>
 </div>
 
 <div class="error-toast" id="error-toast"></div>
@@ -119,6 +126,7 @@ const targetHint = document.getElementById('target-hint');
 const settingsEl = document.getElementById('settings');
 const inputArea = document.getElementById('input-area');
 const agentCards = document.getElementById('agent-cards');
+const activityContent = document.getElementById('activity-content');
 const form = document.getElementById('form');
 const input = document.getElementById('input');
 const errorToast = document.getElementById('error-toast');
@@ -129,12 +137,14 @@ const logs = { all: [] };
 let workerCounter = 5;
 let mentionIdx = -1;
 const streaming = {};
+// Track current tool activity per agent
+const agentTools = {}; // { agentId: [ {title, status} ] }
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}`);
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
-    if (msg.type === 'sessions') { sessions = msg.sessions; renderChannels(); if (showSettings) renderSettings(); }
+    if (msg.type === 'sessions') { sessions = msg.sessions; renderChannels(); renderActivity(); if (showSettings) renderSettings(); }
     else if (msg.type === 'agent_event') handleEvent(msg.agentId, msg.event);
     else if (msg.type === 'error') showError(msg.message);
   };
@@ -143,13 +153,39 @@ function connect() {
 
 function handleEvent(agentId, event) {
   if (!logs[agentId]) logs[agentId] = [];
+
+  // Track tools in activity panel
+  if (event.type === 'tool_start') {
+    if (!agentTools[agentId]) agentTools[agentId] = [];
+    agentTools[agentId].push({ title: event.title, status: 'running' });
+    renderActivity();
+    return; // don't add to chat
+  }
+  if (event.type === 'tool_done') {
+    if (agentTools[agentId]) {
+      const t = agentTools[agentId].find(x => x.title === event.title && x.status === 'running');
+      if (t) t.status = event.status;
+    }
+    renderActivity();
+    return; // don't add to chat
+  }
+  if (event.type === 'turn_end') {
+    agentTools[agentId] = []; // clear tools for this agent
+    streaming[agentId] = null;
+    renderActivity();
+    const entry = { agentId, event };
+    logs.all.push(entry); logs[agentId].push(entry);
+    if (!showSettings) renderMessages();
+    return;
+  }
+
+  // Text events
   if (event.type === 'text') {
     if (agentId === 'user' || agentId === 'system') {
       const entry = { agentId, event };
       logs.all.push(entry);
       if (!logs[agentId]) logs[agentId] = [];
       logs[agentId].push(entry);
-      // Also add user messages to the currently active channel so they appear in context
       if (activeChannel !== 'all' && activeChannel !== agentId) {
         if (!logs[activeChannel]) logs[activeChannel] = [];
         logs[activeChannel].push(entry);
@@ -164,18 +200,36 @@ function handleEvent(agentId, event) {
       }
     }
   } else {
-    if (event.type === 'turn_end') streaming[agentId] = null;
     const entry = { agentId, event };
     logs.all.push(entry); logs[agentId].push(entry);
   }
   if (!showSettings) renderMessages();
 }
 
+function renderActivity() {
+  let html = '';
+  for (const s of sessions) {
+    const tools = agentTools[s.id] || [];
+    const dotClass = s.status;
+    html += `<div class="activity-agent"><div class="activity-agent-name"><span class="dot ${dotClass}"></span>${esc(s.name)}</div>`;
+    if (tools.length) {
+      for (const t of tools) {
+        const name = t.title.split('/').pop() || t.title;
+        html += `<div class="activity-item ${t.status}">${t.status === 'running' ? '⏳' : t.status === 'completed' ? '✓' : '✗'} ${esc(name)}</div>`;
+      }
+    } else {
+      html += `<div class="activity-idle">${s.status === 'working' ? '💭 thinking...' : s.status === 'stopped' ? '—' : 'idle'}</div>`;
+    }
+    html += '</div>';
+  }
+  activityContent.innerHTML = html;
+}
+
 function renderChannels() {
   let html = `<div class="channel ${activeChannel === 'all' ? 'active' : ''}" data-id="all"># all</div>`;
   for (const s of sessions) {
     const cls = activeChannel === s.id ? 'active' : '';
-    const cancelBtn = s.status === 'working' ? `<span class="cancel-btn" data-cancel="${s.id}" title="Cancel task">⏸</span>` : '';
+    const cancelBtn = s.status === 'working' ? `<span class="cancel-btn" data-cancel="${s.id}" title="Cancel">⏸</span>` : '';
     html += `<div class="channel ${cls}" data-id="${s.id}"><span class="dot ${s.status}"></span>${s.name}${cancelBtn}</div>`;
   }
   channelsEl.innerHTML = html;
@@ -191,7 +245,7 @@ function updateHeader() {
   const s = sessions.find(x => x.id === activeChannel);
   headerTitle.textContent = `# ${s ? s.name : activeChannel}`;
   if (activeChannel === 'all') targetHint.textContent = 'Sending to: Master (use @ to pick agent)';
-  else { const a = sessions.find(x => x.id === activeChannel); targetHint.textContent = `Sending to: ${a?.name ?? activeChannel}`; }
+  else targetHint.textContent = `Sending to: ${sessions.find(x => x.id === activeChannel)?.name ?? activeChannel}`;
 }
 
 function renderMessages() {
@@ -205,8 +259,6 @@ function renderMessages() {
     const label = s ? s.name : agentId;
     const role = agentId === 'user' ? 'user' : agentId === 'system' ? 'user' : (s?.role === 'master' ? 'master' : 'worker');
     if (event.type === 'text') html += `<div class="msg"><div class="author ${role}">${esc(label)}</div><div class="text">${esc(event.content)}${event.image ? `<br><img src="data:${event.image.media_type};base64,${event.image.data}" style="max-width:400px;max-height:300px;border-radius:8px;margin-top:6px;">` : ''}</div></div>`;
-    else if (event.type === 'tool_start') html += `<div class="msg"><div class="tool">🔧 ${esc(event.title)}</div></div>`;
-    else if (event.type === 'tool_done') html += `<div class="msg"><div class="tool ${event.status}">✓ ${esc(event.title)}</div></div>`;
     else if (event.type === 'turn_end') html += `<div class="msg"><div class="divider"></div></div>`;
   }
   messagesEl.innerHTML = html;
@@ -219,19 +271,18 @@ function renderSettings() {
     html += `<div class="agent-card" data-id="${s.id}">
       <label>${s.role === 'master' ? '👑 Master' : '👷 Worker'} <span class="status-badge ${s.status}">${s.status}</span></label>
       <label>Name</label><input class="cfg-name" value="${esc(s.name)}" />
-      <label>Working Directory (cwd)</label><input class="cfg-cwd" value="${esc(s.cwd)}" />
-      ${s.configOptions?.length ? s.configOptions.map(opt => `<label>${esc(opt.name)} <span style="color:#f2c744;font-size:10px">(changing restarts agent)</span></label><select class="cfg-option" data-config-id="${opt.id}" data-agent-id="${s.id}">${opt.options.map(o => `<option value="${esc(o.value)}" ${o.value === (s.model || opt.currentValue) ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`).join('') : (s.status !== 'stopped' ? '<label style="color:#666">No config options yet</label>' : '')}
-      <label>Persona (System Prompt)</label><textarea class="cfg-persona">${esc(s.persona)}</textarea>
+      <label>Working Directory</label><input class="cfg-cwd" value="${esc(s.cwd)}" />
+      ${s.configOptions?.length ? s.configOptions.map(opt => `<label>${esc(opt.name)} <span style="color:#f2c744;font-size:10px">(restarts agent)</span></label><select class="cfg-option" data-config-id="${opt.id}" data-agent-id="${s.id}">${opt.options.map(o => `<option value="${esc(o.value)}" ${o.value === (s.model || opt.currentValue) ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`).join('') : (s.status !== 'stopped' ? '' : '')}
+      <label>Persona</label><textarea class="cfg-persona">${esc(s.persona)}</textarea>
       <div class="actions">
         <button class="btn-save" onclick="saveAgent('${s.id}', this)">💾 Save</button>
-        ${s.status === 'stopped' ? `<button class="btn-start" onclick="startAgent('${s.id}', this)">▶ Start</button>` : s.status === 'starting' ? `<button class="btn-start" disabled>⏳ Starting...</button>` : `<button class="btn-stop" onclick="stopAgent('${s.id}')">⏹ Stop</button>`}
-        ${s.status === 'working' ? `<button class="btn-stop" style="background:#f2c744;color:#000" onclick="cancelAgent('${s.id}')">⏸️ Cancel</button>` : ''}
-        ${s.role === 'worker' ? `<button class="btn-remove" onclick="removeAgent('${s.id}')">🗑 Remove</button>` : ''}
+        ${s.status === 'stopped' ? `<button class="btn-start" onclick="startAgent('${s.id}', this)">▶ Start</button>` : s.status === 'starting' ? `<button class="btn-start" disabled>⏳...</button>` : `<button class="btn-stop" onclick="stopAgent('${s.id}')">⏹ Stop</button>`}
+        ${s.status === 'working' ? `<button class="btn-stop" style="background:#f2c744;color:#000" onclick="cancelAgent('${s.id}')">⏸ Cancel</button>` : ''}
+        ${s.role === 'worker' ? `<button class="btn-remove" onclick="removeAgent('${s.id}')">🗑</button>` : ''}
       </div>
     </div>`;
   }
   agentCards.innerHTML = html;
-  // Bind config option change events
   agentCards.querySelectorAll('.cfg-option').forEach(sel => {
     sel.onchange = () => send({ type: 'set_config', id: sel.dataset.agentId, configId: sel.dataset.configId, value: sel.value });
   });
@@ -248,32 +299,23 @@ function send(msg) { if (ws?.readyState === 1) ws.send(JSON.stringify(msg)); }
 
 function saveAgent(id, btn) {
   const card = btn.closest('.agent-card');
-  const name = card.querySelector('.cfg-name').value.trim();
-  const cwd = card.querySelector('.cfg-cwd').value.trim();
-  const persona = card.querySelector('.cfg-persona').value.trim();
-  send({ type: 'update_agent', id, name, persona, cwd });
-  btn.textContent = '✅ Saved'; setTimeout(() => btn.textContent = '💾 Save', 1500);
+  send({ type: 'update_agent', id, name: card.querySelector('.cfg-name').value.trim(), persona: card.querySelector('.cfg-persona').value.trim(), cwd: card.querySelector('.cfg-cwd').value.trim() });
+  btn.textContent = '✅'; setTimeout(() => btn.textContent = '💾 Save', 1500);
 }
-
-function startAgent(id, btn) { if (btn) { btn.disabled = true; btn.textContent = '⏳ Starting...'; } send({ type: 'start_agent', id }); }
+function startAgent(id, btn) { if (btn) { btn.disabled = true; btn.textContent = '⏳...'; } send({ type: 'start_agent', id }); }
 function stopAgent(id) { send({ type: 'stop_agent', id }); }
 function cancelAgent(id) { send({ type: 'cancel_agent', id }); }
 function removeAgent(id) { send({ type: 'remove_agent', id }); }
 
 // --- @mention autocomplete ---
 input.addEventListener('input', () => {
-  const val = input.value;
-  const atIdx = val.lastIndexOf('@');
+  const val = input.value, atIdx = val.lastIndexOf('@');
   if (atIdx === -1 || (atIdx > 0 && val[atIdx - 1] !== ' ')) { mentionPopup.classList.remove('show'); return; }
   const query = val.slice(atIdx + 1).toLowerCase();
-  const running = sessions.filter(s => s.status === 'idle' || s.status === 'working');
-  const matches = [{ id: 'all', name: 'all (broadcast)', role: 'all' }, ...running].filter(s => s.name.toLowerCase().includes(query) || s.id.includes(query));
+  const matches = [{ id: 'all', name: 'all (broadcast)', role: 'all' }, ...sessions.filter(s => s.status !== 'stopped')].filter(s => s.name.toLowerCase().includes(query) || s.id.includes(query));
   if (!matches.length) { mentionPopup.classList.remove('show'); return; }
-  mentionIdx = 0;
-  renderMentions(matches);
-  mentionPopup.classList.add('show');
+  mentionIdx = 0; renderMentions(matches); mentionPopup.classList.add('show');
 });
-
 input.addEventListener('keydown', (e) => {
   if (!mentionPopup.classList.contains('show')) return;
   const items = mentionPopup.querySelectorAll('.mention-item');
@@ -282,72 +324,33 @@ input.addEventListener('keydown', (e) => {
   else if (e.key === 'Enter' && mentionIdx >= 0) { e.preventDefault(); selectMention(items[mentionIdx].dataset.name); }
   else if (e.key === 'Escape') { mentionPopup.classList.remove('show'); }
 });
-
 function renderMentions(matches) {
-  mentionPopup.innerHTML = matches.map((m, i) =>
-    `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-id="${m.id}" data-name="${esc(m.name)}"><span class="role-tag">${m.role}</span> ${esc(m.name)}</div>`
-  ).join('');
+  mentionPopup.innerHTML = matches.map((m, i) => `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-name="${esc(m.name)}"><span class="role-tag">${m.role}</span> ${esc(m.name)}</div>`).join('');
   mentionPopup.querySelectorAll('.mention-item').forEach(el => { el.onclick = () => selectMention(el.dataset.name); });
 }
 function highlightMention(items) { items.forEach((el, i) => el.classList.toggle('selected', i === mentionIdx)); }
-function selectMention(name) {
-  const val = input.value; const atIdx = val.lastIndexOf('@');
-  input.value = val.slice(0, atIdx) + `@${name} `;
-  mentionPopup.classList.remove('show'); input.focus();
-}
+function selectMention(name) { const val = input.value; input.value = val.slice(0, val.lastIndexOf('@')) + `@${name} `; mentionPopup.classList.remove('show'); input.focus(); }
 
 // --- Image paste/upload ---
 const imagePreview = document.getElementById('image-preview');
 const fileInput = document.getElementById('file-input');
-let pendingImage = null; // { media_type, data (base64) }
-
-document.addEventListener('paste', (e) => {
-  const items = e.clipboardData?.items;
-  if (!items) return;
-  for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      e.preventDefault();
-      const file = item.getAsFile();
-      if (file) loadImage(file);
-      break;
-    }
-  }
-});
-
+let pendingImage = null;
+document.addEventListener('paste', (e) => { const items = e.clipboardData?.items; if (!items) return; for (const item of items) { if (item.type.startsWith('image/')) { e.preventDefault(); loadImage(item.getAsFile()); break; } } });
 fileInput.onchange = (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); };
-
-function loadImage(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    const base64 = reader.result.split(',')[1];
-    pendingImage = { media_type: file.type, data: base64 };
-    imagePreview.innerHTML = `<img src="${reader.result}"><span class="remove-img" onclick="clearImage()">✕ remove</span>`;
-  };
-  reader.readAsDataURL(file);
-}
-
+function loadImage(file) { if (!file) return; const r = new FileReader(); r.onload = () => { pendingImage = { media_type: file.type, data: r.result.split(',')[1] }; imagePreview.innerHTML = `<img src="${r.result}"><span class="remove-img" onclick="clearImage()">✕</span>`; }; r.readAsDataURL(file); }
 function clearImage() { pendingImage = null; imagePreview.innerHTML = ''; }
 
-// --- Form submit: channel-aware routing ---
+// --- Form submit ---
 form.onsubmit = (e) => {
   e.preventDefault();
   let text = input.value.trim();
   if (!text && !pendingImage) return;
-
-  // If in a specific agent channel and no @mention, auto-prefix with @agent
-  if (activeChannel !== 'all' && text && !text.startsWith('@')) {
-    const agent = sessions.find(s => s.id === activeChannel);
-    if (agent) text = `@${agent.name} ${text}`;
-  }
-
-  const msg = { type: 'user_message', content: text || '(image)', image: pendingImage };
-  send(msg);
-  input.value = '';
-  clearImage();
-  mentionPopup.classList.remove('show');
+  if (activeChannel !== 'all' && text && !text.startsWith('@')) { const a = sessions.find(s => s.id === activeChannel); if (a) text = `@${a.name} ${text}`; }
+  send({ type: 'user_message', content: text || '(image)', image: pendingImage });
+  input.value = ''; clearImage(); mentionPopup.classList.remove('show');
 };
 
-document.getElementById('btn-settings').onclick = document.getElementById('btn-toggle-view').onclick = () => { showSettings = !showSettings; toggleView(); if (showSettings) renderSettings(); };
+document.getElementById('btn-settings').onclick = () => { showSettings = !showSettings; toggleView(); if (showSettings) renderSettings(); };
 document.getElementById('btn-add-agent').onclick = () => { send({ type: 'add_agent', config: { id: `worker-${workerCounter++}`, name: `Worker ${workerCounter-1}`, role: 'worker', cwd: sessions[0]?.cwd || '', persona: '' } }); };
 document.getElementById('btn-start-all').onclick = () => send({ type: 'start_all' });
 

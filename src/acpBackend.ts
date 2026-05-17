@@ -136,7 +136,7 @@ export function createAcpBackend(command: string, args: string[], workingDir?: s
       const line = makeRequest(id, 'session/prompt', { sessionId, prompt: content });
       let fullText = '';
       return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => { promptSubscriber = null; pending.delete(id); reject(new Error('Prompt timeout')); }, 300000);
+        const timer = setTimeout(() => { promptSubscriber = null; pending.delete(id); reject(new Error('Prompt timeout (10min)')); }, 600000);
         promptSubscriber = (msg) => {
           if (msg.error && msg.id === undefined) { clearTimeout(timer); promptSubscriber = null; reject(new Error(msg.error.message)); return; }
           if (msg.id === id) { clearTimeout(timer); promptSubscriber = null; if (msg.error) reject(new Error(msg.error.message)); else { onEvent({ type: 'turn_end' }); resolve(fullText); } return; }

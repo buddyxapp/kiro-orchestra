@@ -30,8 +30,8 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
   const publicDir = resolve(import.meta.dirname, '..', 'public');
   const server = createServer((req, res) => {
     const url = req.url === '/' ? '/index.html' : req.url!;
-    const filePath = resolve(publicDir, '.' + url);
-    if (!filePath.startsWith(publicDir)) { res.writeHead(403); res.end(); return; }
+    const filePath = resolve(publicDir, '.' + decodeURIComponent(url.split('?')[0]));
+    if (!filePath.startsWith(publicDir + (process.platform === 'win32' ? '\\' : '/'))) { res.writeHead(403); res.end(); return; }
     try {
       const content = readFileSync(filePath);
       const ext = url.split('.').pop();
@@ -49,7 +49,12 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
   function broadcast(msg: ServerMsg) {
     const data = JSON.stringify(msg);
     for (const ws of clients) if (ws.readyState === ws.OPEN) ws.send(data);
-    if (msg.type === 'agent_event') { history.push(msg); if (history.length > MAX_HISTORY) history.shift(); }
+    if (msg.type === 'agent_event') {
+      // Strip image data from history to prevent memory bloat
+      const stored = ('image' in msg.event && msg.event.image) ? { ...msg, event: { ...msg.event, image: undefined } } as ServerMsg : msg;
+      history.push(stored);
+      if (history.length > MAX_HISTORY) history.shift();
+    }
   }
 
   function broadcastSessions() {

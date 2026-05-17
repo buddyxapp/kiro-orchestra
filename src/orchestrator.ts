@@ -102,19 +102,18 @@ export function createOrchestrator(
       const response = await sm.sendPrompt('master', prompt, onEvent, images.length ? images : undefined);
       if (aborted) { processing = false; return; }
 
-      // Parse DISPATCH commands
-      const dispatchLines = response.match(/^DISPATCH\s+([\w-]+):\s*(.+)$/gm);
-      if (dispatchLines) {
-        for (const line of dispatchLines) {
-          const m = line.match(/^DISPATCH\s+([\w-]+):\s*(.+)$/);
-          if (m) {
-            const [, wId, task] = m;
-            const worker = sm.get(wId);
-            if (worker && worker.status === 'idle') {
-              // Fire and forget — worker report will come back via pushWorkerReport
-              executeWorker(wId, task);
-            }
-          }
+      // Parse DISPATCH commands (multi-line: content until next DISPATCH/DONE/end)
+      const parts = response.split(/^(?=DISPATCH\s)/m);
+      for (const part of parts) {
+        const m = part.match(/^DISPATCH\s+([\w-]+):\s*([\s\S]*)/);
+        if (!m) continue;
+        const wId = m[1];
+        // Task = everything after "DISPATCH id:" until DONE or end, trimmed
+        const task = m[2].replace(/\bDONE\s*$/, '').trim();
+        if (!task) continue;
+        const worker = sm.get(wId);
+        if (worker && worker.status === 'idle') {
+          executeWorker(wId, task);
         }
       }
     } catch (err) {
@@ -174,7 +173,6 @@ export function createOrchestrator(
       inbox.length = 0;
       sm.get('master')?.backend?.cancel();
       if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
-      if (minuteResetTimer) clearInterval(minuteResetTimer);
     },
   };
 }
