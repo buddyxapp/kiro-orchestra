@@ -14,6 +14,7 @@ export interface AcpBackend {
   getSessionId(): string | null;
   getConfigOptions(): Array<{ id: string; name: string; currentValue: string; options: Array<{ value: string; name: string }> }>;
   sessionNew(cwd: string): Promise<string>;
+  sessionLoad(sid: string, cwd: string): Promise<string>;
   setConfigOption(configId: string, value: string): Promise<void>;
   sendPrompt(content: ContentBlock[], onEvent: (event: AcpEvent) => void): Promise<string>;
   cancel(): void;
@@ -105,6 +106,13 @@ export function createAcpBackend(command: string, args: string[], workingDir?: s
       if (!sid) throw new Error('No sessionId');
       sessionId = sid;
       configOptions = parseConfigOptions(result);
+      return sid;
+    },
+    async sessionLoad(sid: string, cwd: string) {
+      const resp = await sendRequest('session/load', { sessionId: sid, cwd }, 120000);
+      sessionId = sid;
+      const result = resp.result as Record<string, unknown>;
+      if (result) configOptions = parseConfigOptions(result);
       return sid;
     },
     async setConfigOption(configId: string, value: string) {

@@ -70,6 +70,7 @@ export function createSessionManager(command: string, args: string[], orchestraD
       const backend = createAcpBackend(command, agentArgs, s.config.cwd);
       await backend.start();
       await backend.sessionNew(s.config.cwd);
+
       s.backend = backend;
       s.configOptions = backend.getConfigOptions();
       logger.info('configOptions received', { options: JSON.stringify(s.configOptions) });
@@ -83,7 +84,7 @@ export function createSessionManager(command: string, args: string[], orchestraD
         }
       });
 
-      // Send persona + KIRO.md guidelines + wiki location
+      // Send persona + KIRO.md guidelines
       if (s.config.persona) {
         let kiroMd = '';
         try { kiroMd = readFileSync(resolve(wikisRoot, '..', 'KIRO.md'), 'utf-8'); } catch { /* optional */ }
