@@ -5,22 +5,27 @@
 import { spawn, execSync, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { logger } from './logger.js';
-import { type JsonRpcMessage, type AcpEvent, type ContentBlock, classifyNotification, buildPermissionResponse, makeRequest, makeResponse } from './acpProtocol.js';
+import { type JsonRpcMessage, type AcpEvent, type ContentBlock, type ConfigOption, classifyNotification, buildPermissionResponse, makeRequest, makeResponse, parseConfigOptions } from './acpProtocol.js';
 
 export interface AcpBackend {
   start(): Promise<void>;
   stop(): void;
   isAlive(): boolean;
   getSessionId(): string | null;
+  getConfigOptions(): Array<{ id: string; name: string; currentValue: string; options: Array<{ value: string; name: string }> }>;
   sessionNew(cwd: string): Promise<string>;
+  setConfigOption(configId: string, value: string): Promise<void>;
   sendPrompt(content: ContentBlock[], onEvent: (event: AcpEvent) => void): Promise<string>;
   cancel(): void;
+  onClose(cb: (code: number | null) => void): void;
 }
 
 export function createAcpBackend(command: string, args: string[], workingDir?: string, extraEnv?: Record<string, string>): AcpBackend {
   let proc: ChildProcess | null = null;
   let nextId = 1;
   let sessionId: string | null = null;
+  let configOptions: ConfigOption[] = [];
+  let closeCallback: ((code: number | null) => void) | null = null;
   const pending = new Map<number, { resolve: (msg: JsonRpcMessage) => void; reject: (e: Error) => void }>();
   let promptSubscriber: ((msg: JsonRpcMessage) => void) | null = null;
   let rl: ReturnType<typeof createInterface> | null = null;
@@ -74,7 +79,7 @@ export function createAcpBackend(command: string, args: string[], workingDir?: s
       rl.on('line', (line) => { const t = line.trim(); if (!t) return; try { handleMessage(JSON.parse(t)); } catch { /* non-JSON */ } });
       proc.stderr?.on('data', (d: Buffer) => logger.debug('acp_stderr', { line: d.toString().trim() }));
       proc.on('error', (err) => { for (const [, p] of pending) p.reject(err); pending.clear(); proc = null; });
-      proc.on('close', (code) => { for (const [, p] of pending) p.reject(new Error(`exited: ${code}`)); pending.clear(); proc = null; sessionId = null; });
+      proc.on('close', (code) => { logger.warn('ACP process exited', { code }); for (const [, p] of pending) p.reject(new Error(`exited: ${code}`)); pending.clear(); proc = null; sessionId = null; if (closeCallback) closeCallback(code); });
       await sendRequest('initialize', { protocolVersion: 1, clientCapabilities: {}, clientInfo: { name: 'kiro-orchestra', version: '0.1.0' } }, 120000);
       logger.info('ACP initialized');
     },
@@ -92,12 +97,30 @@ export function createAcpBackend(command: string, args: string[], workingDir?: s
     },
     isAlive: () => proc != null && !proc.killed,
     getSessionId: () => sessionId,
+    getConfigOptions: () => configOptions,
     async sessionNew(cwd: string) {
       const resp = await sendRequest('session/new', { cwd, mcpServers: [] }, 120000);
-      const sid = (resp.result as Record<string, unknown>)?.sessionId as string;
+      const result = resp.result as Record<string, unknown>;
+      const sid = result?.sessionId as string;
       if (!sid) throw new Error('No sessionId');
       sessionId = sid;
+      configOptions = parseConfigOptions(result);
       return sid;
+    },
+    async setConfigOption(configId: string, value: string) {
+      if (!sessionId) throw new Error('No session');
+      for (const opt of configOptions) { if (opt.id === configId) opt.currentValue = value; }
+      try {
+        const resp = await sendRequest('session/set_config_option', { sessionId, configId, value });
+        const result = resp.result as Record<string, unknown>;
+        if (result) configOptions = parseConfigOptions(result);
+        logger.info('Config option set', { configId, value });
+      } catch {
+        // Fallback: send as slash command prompt (same as OpenABWindows)
+        const cmd = `/${configId} ${value}`;
+        logger.info('Fallback: sending as prompt', { cmd });
+        await sendRequest('session/prompt', { sessionId, prompt: [{ type: 'text', text: cmd }] }, 30000);
+      }
     },
     async sendPrompt(content: ContentBlock[], onEvent: (event: AcpEvent) => void): Promise<string> {
       if (!sessionId) throw new Error('No session');
@@ -117,5 +140,6 @@ export function createAcpBackend(command: string, args: string[], workingDir?: s
       });
     },
     cancel() { if (!sessionId) return; writeLine(makeRequest(nextId++, 'session/cancel', { sessionId })).catch(() => {}); },
+    onClose(cb: (code: number | null) => void) { closeCallback = cb; },
   };
 }

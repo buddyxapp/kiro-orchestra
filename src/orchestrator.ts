@@ -10,14 +10,15 @@ import { logger } from './logger.js';
 
 export interface InboxEvent {
   timestamp: string;
-  from: string;       // 'user' | worker-id
-  summary: string;    // short (for master context)
-  fullText?: string;  // long (saved to wiki if > threshold)
-  savedTo?: string;   // wiki file path if saved
+  from: string;
+  summary: string;
+  fullText?: string;
+  savedTo?: string;
+  image?: { media_type: string; data: string };
 }
 
 export interface Orchestrator {
-  pushUserMessage(text: string): void;
+  pushUserMessage(text: string, image?: { media_type: string; data: string }): void;
   pushWorkerReport(workerId: string, workerName: string, text: string): void;
   abort(): void;
 }
@@ -86,15 +87,19 @@ export function createOrchestrator(
     // Drain inbox
     const events = inbox.splice(0);
 
+    // Collect images from events
+    const images = events.filter(e => e.image).map(e => e.image!);
+    if (images.length) logger.info('Orchestrator: passing images to master', { count: images.length });
+
     // Build prompt for master
     const workers = sm.getAll().filter(s => s.config.role === 'worker');
     const statusLines = workers.map(w => `- ${w.config.name} (${w.config.id}): ${w.status}`).join('\n');
-    const eventLines = events.map(e => `[${e.timestamp}] ${e.from}: ${e.summary}${e.savedTo ? ` (全文: ${e.savedTo})` : ''}`).join('\n');
+    const eventLines = events.map(e => `[${e.timestamp}] ${e.from}: ${e.summary}${e.savedTo ? ` (full: ${e.savedTo})` : ''}${e.image ? ' [+image]' : ''}`).join('\n');
 
-    const prompt = `[當前 Worker 狀態]\n${statusLines}\n\n[新事件 - ${events.length} 則]\n${eventLines}\n\n[指揮規則]\n1. 回覆使用者：直接寫回覆內容\n2. 分派任務：DISPATCH worker-id: 任務內容\n3. 需要讀 wiki 細節：用工具讀取檔案\n4. 全部處理完畢且無需分派：結尾加 DONE`;
+    const prompt = `[Worker Status]\n${statusLines}\n\n[New Events - ${events.length}]\n${eventLines}\n\n[Rules]\n1. Reply to user: write directly\n2. Dispatch: DISPATCH worker-id: task\n3. Need details: read wiki files\n4. All done: end with DONE`;
 
     try {
-      const response = await sm.sendPrompt('master', prompt, onEvent);
+      const response = await sm.sendPrompt('master', prompt, onEvent, images.length ? images : undefined);
       if (aborted) { processing = false; return; }
 
       // Parse DISPATCH commands
@@ -149,8 +154,8 @@ export function createOrchestrator(
   }
 
   return {
-    pushUserMessage(text: string) {
-      inbox.push({ timestamp: now(), from: 'user', summary: text });
+    pushUserMessage(text: string, image?: { media_type: string; data: string }) {
+      inbox.push({ timestamp: now(), from: 'user', summary: text, image });
       scheduleWake();
     },
 

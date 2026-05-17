@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kiro Orchestra — Architecture</title>
+<style>
+body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; margin: 0; padding: 40px 20px; line-height: 1.6; }
+.container { max-width: 960px; margin: 0 auto; }
+h1 { text-align: center; color: #58a6ff; font-size: 28px; margin-bottom: 5px; }
+.subtitle { text-align: center; color: #8b949e; margin-bottom: 40px; }
+.subtitle a { color: #58a6ff; }
+h2 { color: #ff7b72; margin-top: 50px; font-size: 20px; border-left: 4px solid #ff7b72; padding-left: 12px; }
+
+/* Diagram styles */
+.diagram { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 30px 0; }
+.layer { width: 100%; max-width: 800px; border: 2px solid; border-radius: 14px; padding: 20px; position: relative; margin: 0; }
+.layer-title { position: absolute; top: -12px; left: 20px; background: #0d1117; padding: 0 8px; font-size: 12px; font-weight: bold; letter-spacing: 1px; }
+.layer-browser { border-color: #58a6ff; }
+.layer-browser .layer-title { color: #58a6ff; }
+.layer-server { border-color: #f2c744; }
+.layer-server .layer-title { color: #f2c744; }
+.layer-kiro { border-color: #3fb950; }
+.layer-kiro .layer-title { color: #3fb950; }
+
+.connector { width: 2px; height: 30px; background: #30363d; position: relative; }
+.connector::after { content: '▼'; position: absolute; bottom: -8px; left: -6px; color: #8b949e; font-size: 12px; }
+.connector-label { font-size: 11px; color: #8b949e; text-align: center; margin: -5px 0; }
+
+/* Boxes inside layers */
+.row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+.box { border: 1px solid #30363d; border-radius: 8px; padding: 10px 16px; text-align: center; background: #161b22; min-width: 120px; }
+.box-title { font-weight: bold; font-size: 13px; margin-bottom: 4px; }
+.box-desc { font-size: 11px; color: #8b949e; }
+.box.master { border-color: #f2c744; }
+.box.master .box-title { color: #f2c744; }
+.box.worker { border-color: #3fb950; }
+.box.worker .box-title { color: #3fb950; }
+.box.orch { border-color: #ff7b72; }
+.box.orch .box-title { color: #ff7b72; }
+.box.ui { border-color: #58a6ff; }
+.box.ui .box-title { color: #58a6ff; }
+
+/* Flow diagram */
+.flow { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 20px 0; flex-wrap: wrap; }
+.flow-step { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 8px 14px; font-size: 12px; text-align: center; }
+.flow-step.highlight { border-color: #f2c744; color: #f2c744; }
+.flow-arrow { color: #3fb950; font-size: 18px; }
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+th, td { border: 1px solid #30363d; padding: 10px 12px; text-align: left; font-size: 13px; }
+th { background: #161b22; color: #58a6ff; }
+code { background: #161b22; padding: 2px 6px; border-radius: 4px; color: #79c0ff; font-size: 12px; }
+
+/* Feature cards */
+.features { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+.feature { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 14px; }
+.feature-icon { font-size: 20px; margin-bottom: 6px; }
+.feature-title { font-weight: bold; font-size: 13px; color: #fff; margin-bottom: 4px; }
+.feature-desc { font-size: 12px; color: #8b949e; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🎼 Kiro Orchestra</h1>
+<div class="subtitle">Local multi-agent orchestration UI for kiro-cli<br><a href="https://github.com/buddyxapp/kiro-orchestra">github.com/buddyxapp/kiro-orchestra</a></div>
+
+<h2>System Architecture</h2>
+
+<div class="diagram">
+  <!-- Browser Layer -->
+  <div class="layer layer-browser">
+    <div class="layer-title">BROWSER</div>
+    <div class="row">
+      <div class="box ui"><div class="box-title">Slack-like UI</div><div class="box-desc">Channels • Chat • @mention<br>Settings • Model selector</div></div>
+    </div>
+    <div class="box-desc" style="text-align:center;margin-top:8px;color:#58a6ff;">http://localhost:3000</div>
+  </div>
+
+  <div class="connector"></div>
+  <div class="connector-label">WebSocket (real-time streaming)</div>
+  <div class="connector"></div>
+
+  <!-- Server Layer -->
+  <div class="layer layer-server">
+    <div class="layer-title">NODE.JS SERVER</div>
+    <div class="row">
+      <div class="box orch"><div class="box-title">Orchestrator</div><div class="box-desc">Event inbox • Debounce<br>DISPATCH parser • Wiki save</div></div>
+      <div class="box" style="border-color:#8b949e;"><div class="box-title" style="color:#8b949e;">Session Manager</div><div class="box-desc">Start • Stop • Cancel<br>Config • Model switch</div></div>
+    </div>
+  </div>
+
+  <div class="connector"></div>
+  <div class="connector-label">stdin/stdout (JSON-RPC 2.0 — ACP Protocol)</div>
+  <div class="connector"></div>
+
+  <!-- Kiro CLI Layer -->
+  <div class="layer layer-kiro">
+    <div class="layer-title">KIRO-CLI PROCESSES</div>
+    <div class="row">
+      <div class="box master"><div class="box-title">👑 Master</div><div class="box-desc">Dispatches tasks<br>Monitors results</div></div>
+      <div class="box worker"><div class="box-title">👷 Worker 1</div><div class="box-desc">Executes tasks</div></div>
+      <div class="box worker"><div class="box-title">👷 Worker 2</div><div class="box-desc">Executes tasks</div></div>
+      <div class="box worker"><div class="box-title">👷 Worker 3</div><div class="box-desc">Executes tasks</div></div>
+      <div class="box worker"><div class="box-title">👷 Worker 4</div><div class="box-desc">Executes tasks</div></div>
+    </div>
+    <div class="box-desc" style="text-align:center;margin-top:10px;color:#3fb950;">Each agent: full MCP tools (Salesforce, Outlook, AWS) + file system + shell</div>
+  </div>
+</div>
+
+<h2>Orchestration Flow</h2>
+
+<div class="flow">
+  <div class="flow-step">👤 User types message</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step highlight">📥 Inbox (1.5s debounce)</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step highlight">👑 Master wakes</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">DISPATCH commands</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">👷 Workers (parallel)</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">📝 Results → Wiki</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step highlight">📥 Summary → Inbox</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">🔄 Loop until DONE</div>
+</div>
+
+<h2>Features</h2>
+
+<div class="features">
+  <div class="feature"><div class="feature-icon">⚡</div><div class="feature-title">Parallel Execution</div><div class="feature-desc">Multiple workers run tasks simultaneously</div></div>
+  <div class="feature"><div class="feature-icon">🧠</div><div class="feature-title">Event-Driven Master</div><div class="feature-desc">Stays responsive while workers are busy. Accepts new input anytime.</div></div>
+  <div class="feature"><div class="feature-icon">📚</div><div class="feature-title">LLM Wiki (per agent)</div><div class="feature-desc">Persistent knowledge that compounds over time. Long results saved to files.</div></div>
+  <div class="feature"><div class="feature-icon">🎯</div><div class="feature-title">@mention Routing</div><div class="feature-desc">Direct messages to specific agents or broadcast to all</div></div>
+  <div class="feature"><div class="feature-icon">🤖</div><div class="feature-title">Model Selection</div><div class="feature-desc">Each agent can use a different AI model (Opus, Sonnet, Haiku, etc.)</div></div>
+  <div class="feature"><div class="feature-icon">⏸️</div><div class="feature-title">Cancel Anytime</div><div class="feature-desc">Stop individual agents or interrupt everything with one click</div></div>
+  <div class="feature"><div class="feature-icon">🔌</div><div class="feature-title">Full MCP Access</div><div class="feature-desc">Every agent has Salesforce, Outlook, AWS CLI, and all configured tools</div></div>
+  <div class="feature"><div class="feature-icon">🏠</div><div class="feature-title">100% Local</div><div class="feature-desc">Runs on localhost. No external services. No API keys beyond kiro-cli.</div></div>
+</div>
+
+<h2>User Controls</h2>
+<table>
+<tr><th>Action</th><th>How</th></tr>
+<tr><td>Talk to Master</td><td>Just type (no @)</td></tr>
+<tr><td>Talk to specific agent</td><td><code>@Worker 1 do this</code> or click its channel</td></tr>
+<tr><td>Broadcast to all</td><td><code>@all hello</code></td></tr>
+<tr><td>Interrupt everything</td><td>Type <code>stop</code></td></tr>
+<tr><td>Cancel one agent</td><td>Click ⏸ next to it in sidebar</td></tr>
+<tr><td>Change model</td><td>Settings → dropdown (restarts agent)</td></tr>
+<tr><td>Change working dir</td><td>Settings → cwd field → Save</td></tr>
+</table>
+
+<h2>Quick Start</h2>
+<table>
+<tr><th>Step</th><th>Command</th></tr>
+<tr><td>1. Clone</td><td><code>git clone https://github.com/buddyxapp/kiro-orchestra.git</code></td></tr>
+<tr><td>2. Install</td><td><code>cd kiro-orchestra && npm install</code></td></tr>
+<tr><td>3. Run</td><td><code>npm start</code></td></tr>
+<tr><td>4. Open</td><td><code>http://localhost:3000</code></td></tr>
+<tr><td>5. Start agents</td><td>Click ⚙️ Settings → Start</td></tr>
+</table>
+
+<h2>Built On</h2>
+<div class="row" style="margin-top:15px;">
+  <div class="box"><div class="box-title" style="color:#58a6ff;">OpenABWindows</div><div class="box-desc">ACP protocol modules<br>Process spawn & management</div></div>
+  <div class="box"><div class="box-title" style="color:#58a6ff;">LLM Wiki (Karpathy)</div><div class="box-desc">Per-agent persistent wiki<br>Knowledge compounds over time</div></div>
+  <div class="box"><div class="box-title" style="color:#58a6ff;">kiro-cli</div><div class="box-desc">AI engine + MCP tools<br>ACP protocol interface</div></div>
+</div>
+
+</div>
+</body>
+</html>

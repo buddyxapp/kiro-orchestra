@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Kiro Orchestra</title>
@@ -35,27 +35,28 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 .msg .tool { font-size: 11px; color: #999; padding: 3px 8px; background: #2a2a2a; border-radius: 4px; margin: 3px 0; display: inline-block; }
 .msg .tool.completed { border-left: 3px solid #2bac76; }
 .msg .tool.failed { border-left: 3px solid #e74c3c; }
-.msg .thinking { font-size: 11px; color: #888; font-style: italic; }
 .msg .divider { border-bottom: 1px solid #333; margin: 8px 0; }
-/* Input area */
 .input-area { padding: 10px 20px; border-top: 1px solid #333; position: relative; }
+.input-area .target-hint { font-size: 11px; color: #888; margin-bottom: 4px; }
 .input-area form { display: flex; gap: 8px; }
 .input-area input { flex: 1; background: #222529; border: 1px solid #444; border-radius: 6px; padding: 10px 14px; color: #fff; font-size: 13px; outline: none; }
 .input-area input:focus { border-color: #1164a3; }
 .input-area button { background: #1164a3; color: #fff; border: none; border-radius: 6px; padding: 10px 14px; cursor: pointer; font-size: 13px; }
-/* @mention popup */
+.img-btn { cursor: pointer; font-size: 18px; display: flex; align-items: center; padding: 0 4px; }
+.image-preview { margin-bottom: 6px; }
+.image-preview img { max-height: 100px; border-radius: 6px; border: 1px solid #444; }
+.image-preview .remove-img { cursor: pointer; margin-left: 6px; color: #ff7b72; font-size: 12px; }
 .mention-popup { display: none; position: absolute; bottom: 100%; left: 20px; right: 20px; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; padding: 6px 0; margin-bottom: 4px; max-height: 200px; overflow-y: auto; z-index: 10; }
 .mention-popup.show { display: block; }
 .mention-item { padding: 6px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .mention-item:hover, .mention-item.selected { background: #1164a3; color: #fff; }
 .mention-item .role-tag { font-size: 10px; background: #444; padding: 1px 5px; border-radius: 3px; color: #aaa; }
-/* Settings */
 .settings { display: none; flex: 1; flex-direction: column; padding: 20px; overflow-y: auto; }
 .settings.show { display: flex; }
 .settings h2 { color: #fff; margin-bottom: 16px; font-size: 16px; }
 .agent-card { background: #222; border: 1px solid #333; border-radius: 8px; padding: 14px; margin-bottom: 12px; }
 .agent-card label { font-size: 11px; color: #888; display: block; margin-bottom: 3px; }
-.agent-card input, .agent-card textarea { width: 100%; background: #1a1d21; border: 1px solid #444; border-radius: 4px; padding: 6px 10px; color: #fff; font-size: 12px; margin-bottom: 8px; outline: none; font-family: inherit; }
+.agent-card input, .agent-card textarea, .agent-card select { width: 100%; background: #1a1d21; border: 1px solid #444; border-radius: 4px; padding: 6px 10px; color: #fff; font-size: 12px; margin-bottom: 8px; outline: none; font-family: inherit; }
 .agent-card textarea { height: 50px; resize: vertical; }
 .agent-card .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .agent-card .actions button { padding: 5px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 11px; }
@@ -79,29 +80,32 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 <div class="sidebar">
   <h1>🎼 Kiro Orchestra</h1>
   <div class="channels" id="channels"></div>
-  <div class="sidebar-btn" id="btn-settings">⚙️ Agent 設定</div>
+  <div class="sidebar-btn" id="btn-settings">⚙️ Settings</div>
 </div>
 
 <div class="main">
   <div class="header">
     <span id="header-title"># all</span>
-    <button id="btn-toggle-view">⚙️ 設定</button>
+    <button id="btn-toggle-view">⚙️ Settings</button>
   </div>
 
   <div class="messages" id="messages"></div>
   <div class="input-area" id="input-area">
+    <div class="target-hint" id="target-hint">Sending to: Master (use @ to pick agent)</div>
     <div class="mention-popup" id="mention-popup"></div>
+    <div class="image-preview" id="image-preview"></div>
     <form id="form">
-      <input id="input" placeholder="輸入訊息... 打 @ 選擇要對話的 agent" autocomplete="off" />
-      <button type="submit">送出</button>
+      <input id="input" placeholder="Type a message... (Ctrl+V to paste image)" autocomplete="off" />
+      <label class="img-btn" title="Paste image from clipboard">📎<input type="file" id="file-input" accept="image/*" style="display:none"></label>
+      <button type="submit">Send</button>
     </form>
   </div>
 
   <div class="settings" id="settings">
-    <h2>⚙️ Agent 設定</h2>
+    <h2>⚙️ Agent Settings</h2>
     <div id="agent-cards"></div>
-    <button class="btn-add" id="btn-add-agent">+ 新增 Worker</button>
-    <button class="btn-startall" id="btn-start-all">🚀 全部啟動</button>
+    <button class="btn-add" id="btn-add-agent">+ Add Worker</button>
+    <button class="btn-startall" id="btn-start-all">🚀 Start All</button>
   </div>
 </div>
 
@@ -111,6 +115,7 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 const messagesEl = document.getElementById('messages');
 const channelsEl = document.getElementById('channels');
 const headerTitle = document.getElementById('header-title');
+const targetHint = document.getElementById('target-hint');
 const settingsEl = document.getElementById('settings');
 const inputArea = document.getElementById('input-area');
 const agentCards = document.getElementById('agent-cards');
@@ -123,8 +128,7 @@ let ws, sessions = [], activeChannel = 'all', showSettings = false;
 const logs = { all: [] };
 let workerCounter = 5;
 let mentionIdx = -1;
-// Track current streaming message per agent
-const streaming = {}; // agentId -> { el: DOM element, text: '' }
+const streaming = {};
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}`);
@@ -139,20 +143,21 @@ function connect() {
 
 function handleEvent(agentId, event) {
   if (!logs[agentId]) logs[agentId] = [];
-
   if (event.type === 'text') {
-    // User messages are always standalone (not streamed)
-    if (agentId === 'user') {
+    if (agentId === 'user' || agentId === 'system') {
       const entry = { agentId, event };
       logs.all.push(entry);
-      logs[agentId] = logs[agentId] || [];
+      if (!logs[agentId]) logs[agentId] = [];
       logs[agentId].push(entry);
+      // Also add user messages to the currently active channel so they appear in context
+      if (activeChannel !== 'all' && activeChannel !== agentId) {
+        if (!logs[activeChannel]) logs[activeChannel] = [];
+        logs[activeChannel].push(entry);
+      }
     } else {
-      // Agent streaming: accumulate chunks into one message
       if (!streaming[agentId]) {
         const entry = { agentId, event: { type: 'text', content: event.content } };
-        logs.all.push(entry);
-        logs[agentId].push(entry);
+        logs.all.push(entry); logs[agentId].push(entry);
         streaming[agentId] = entry;
       } else {
         streaming[agentId].event.content += event.content;
@@ -161,27 +166,32 @@ function handleEvent(agentId, event) {
   } else {
     if (event.type === 'turn_end') streaming[agentId] = null;
     const entry = { agentId, event };
-    logs.all.push(entry);
-    logs[agentId].push(entry);
+    logs.all.push(entry); logs[agentId].push(entry);
   }
-
-  if (!showSettings && (activeChannel === 'all' || activeChannel === agentId)) renderMessages();
+  if (!showSettings) renderMessages();
 }
 
 function renderChannels() {
   let html = `<div class="channel ${activeChannel === 'all' ? 'active' : ''}" data-id="all"># all</div>`;
   for (const s of sessions) {
     const cls = activeChannel === s.id ? 'active' : '';
-    const cancelBtn = s.status === 'working' ? `<span class="cancel-btn" data-cancel="${s.id}" title="取消任務">⏸</span>` : '';
+    const cancelBtn = s.status === 'working' ? `<span class="cancel-btn" data-cancel="${s.id}" title="Cancel task">⏸</span>` : '';
     html += `<div class="channel ${cls}" data-id="${s.id}"><span class="dot ${s.status}"></span>${s.name}${cancelBtn}</div>`;
   }
   channelsEl.innerHTML = html;
   channelsEl.querySelectorAll('.channel').forEach(el => {
-    el.onclick = (e) => { if (e.target.classList?.contains('cancel-btn')) return; activeChannel = el.dataset.id; showSettings = false; toggleView(); renderChannels(); renderMessages(); headerTitle.textContent = `# ${activeChannel}`; };
+    el.onclick = (e) => { if (e.target.classList?.contains('cancel-btn')) return; activeChannel = el.dataset.id; showSettings = false; toggleView(); renderChannels(); renderMessages(); updateHeader(); };
   });
   channelsEl.querySelectorAll('.cancel-btn').forEach(el => {
     el.onclick = (e) => { e.stopPropagation(); cancelAgent(el.dataset.cancel); };
   });
+}
+
+function updateHeader() {
+  const s = sessions.find(x => x.id === activeChannel);
+  headerTitle.textContent = `# ${s ? s.name : activeChannel}`;
+  if (activeChannel === 'all') targetHint.textContent = 'Sending to: Master (use @ to pick agent)';
+  else { const a = sessions.find(x => x.id === activeChannel); targetHint.textContent = `Sending to: ${a?.name ?? activeChannel}`; }
 }
 
 function renderMessages() {
@@ -189,19 +199,14 @@ function renderMessages() {
   let html = '';
   const seen = new Set();
   for (const entry of entries) {
-    // Deduplicate: streaming entries are mutated in place, skip if already rendered same object
-    if (entry.event.type === 'text') {
-      if (seen.has(entry)) continue;
-      seen.add(entry);
-    }
+    if (entry.event.type === 'text') { if (seen.has(entry)) continue; seen.add(entry); }
     const { agentId, event } = entry;
     const s = sessions.find(x => x.id === agentId);
     const label = s ? s.name : agentId;
-    const role = agentId === 'user' ? 'user' : (s?.role === 'master' ? 'master' : 'worker');
-    if (event.type === 'text') html += `<div class="msg"><div class="author ${role}">${esc(label)}</div><div class="text">${esc(event.content)}</div></div>`;
+    const role = agentId === 'user' ? 'user' : agentId === 'system' ? 'user' : (s?.role === 'master' ? 'master' : 'worker');
+    if (event.type === 'text') html += `<div class="msg"><div class="author ${role}">${esc(label)}</div><div class="text">${esc(event.content)}${event.image ? `<br><img src="data:${event.image.media_type};base64,${event.image.data}" style="max-width:400px;max-height:300px;border-radius:8px;margin-top:6px;">` : ''}</div></div>`;
     else if (event.type === 'tool_start') html += `<div class="msg"><div class="tool">🔧 ${esc(event.title)}</div></div>`;
     else if (event.type === 'tool_done') html += `<div class="msg"><div class="tool ${event.status}">✓ ${esc(event.title)}</div></div>`;
-    else if (event.type === 'thinking') {} // skip thinking noise
     else if (event.type === 'turn_end') html += `<div class="msg"><div class="divider"></div></div>`;
   }
   messagesEl.innerHTML = html;
@@ -213,17 +218,23 @@ function renderSettings() {
   for (const s of sessions) {
     html += `<div class="agent-card" data-id="${s.id}">
       <label>${s.role === 'master' ? '👑 Master' : '👷 Worker'} <span class="status-badge ${s.status}">${s.status}</span></label>
-      <label>名字</label><input class="cfg-name" value="${esc(s.name)}" />
-      <label>個性 (System Prompt)</label><textarea class="cfg-persona">${esc(s.persona)}</textarea>
+      <label>Name</label><input class="cfg-name" value="${esc(s.name)}" />
+      <label>Working Directory (cwd)</label><input class="cfg-cwd" value="${esc(s.cwd)}" />
+      ${s.configOptions?.length ? s.configOptions.map(opt => `<label>${esc(opt.name)} <span style="color:#f2c744;font-size:10px">(changing restarts agent)</span></label><select class="cfg-option" data-config-id="${opt.id}" data-agent-id="${s.id}">${opt.options.map(o => `<option value="${esc(o.value)}" ${o.value === (s.model || opt.currentValue) ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`).join('') : (s.status !== 'stopped' ? '<label style="color:#666">No config options yet</label>' : '')}
+      <label>Persona (System Prompt)</label><textarea class="cfg-persona">${esc(s.persona)}</textarea>
       <div class="actions">
-        <button class="btn-save" onclick="saveAgent('${s.id}', this)">💾 儲存</button>
-        ${s.status === 'stopped' ? `<button class="btn-start" onclick="startAgent('${s.id}', this)">▶ 啟動</button>` : s.status === 'starting' ? `<button class="btn-start" disabled>⏳ 啟動中...</button>` : `<button class="btn-stop" onclick="stopAgent('${s.id}')">⏹ 停止</button>`}
-        ${s.status === 'working' ? `<button class="btn-stop" style="background:#f2c744;color:#000" onclick="cancelAgent('${s.id}')">⏸️ 取消任務</button>` : ''}
-        ${s.role === 'worker' ? `<button class="btn-remove" onclick="removeAgent('${s.id}')">🗑 移除</button>` : ''}
+        <button class="btn-save" onclick="saveAgent('${s.id}', this)">💾 Save</button>
+        ${s.status === 'stopped' ? `<button class="btn-start" onclick="startAgent('${s.id}', this)">▶ Start</button>` : s.status === 'starting' ? `<button class="btn-start" disabled>⏳ Starting...</button>` : `<button class="btn-stop" onclick="stopAgent('${s.id}')">⏹ Stop</button>`}
+        ${s.status === 'working' ? `<button class="btn-stop" style="background:#f2c744;color:#000" onclick="cancelAgent('${s.id}')">⏸️ Cancel</button>` : ''}
+        ${s.role === 'worker' ? `<button class="btn-remove" onclick="removeAgent('${s.id}')">🗑 Remove</button>` : ''}
       </div>
     </div>`;
   }
   agentCards.innerHTML = html;
+  // Bind config option change events
+  agentCards.querySelectorAll('.cfg-option').forEach(sel => {
+    sel.onchange = () => send({ type: 'set_config', id: sel.dataset.agentId, configId: sel.dataset.configId, value: sel.value });
+  });
 }
 
 function toggleView() {
@@ -238,15 +249,13 @@ function send(msg) { if (ws?.readyState === 1) ws.send(JSON.stringify(msg)); }
 function saveAgent(id, btn) {
   const card = btn.closest('.agent-card');
   const name = card.querySelector('.cfg-name').value.trim();
+  const cwd = card.querySelector('.cfg-cwd').value.trim();
   const persona = card.querySelector('.cfg-persona').value.trim();
-  send({ type: 'update_agent', id, name, persona });
-  btn.textContent = '✅ 已儲存'; setTimeout(() => btn.textContent = '💾 儲存', 1500);
+  send({ type: 'update_agent', id, name, persona, cwd });
+  btn.textContent = '✅ Saved'; setTimeout(() => btn.textContent = '💾 Save', 1500);
 }
 
-function startAgent(id, btn) {
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 啟動中...'; }
-  send({ type: 'start_agent', id });
-}
+function startAgent(id, btn) { if (btn) { btn.disabled = true; btn.textContent = '⏳ Starting...'; } send({ type: 'start_agent', id }); }
 function stopAgent(id) { send({ type: 'stop_agent', id }); }
 function cancelAgent(id) { send({ type: 'cancel_agent', id }); }
 function removeAgent(id) { send({ type: 'remove_agent', id }); }
@@ -258,7 +267,7 @@ input.addEventListener('input', () => {
   if (atIdx === -1 || (atIdx > 0 && val[atIdx - 1] !== ' ')) { mentionPopup.classList.remove('show'); return; }
   const query = val.slice(atIdx + 1).toLowerCase();
   const running = sessions.filter(s => s.status === 'idle' || s.status === 'working');
-  const matches = [{ id: 'all', name: '全部 (廣播)', role: 'all' }, ...running].filter(s => s.name.toLowerCase().includes(query) || s.id.includes(query));
+  const matches = [{ id: 'all', name: 'all (broadcast)', role: 'all' }, ...running].filter(s => s.name.toLowerCase().includes(query) || s.id.includes(query));
   if (!matches.length) { mentionPopup.classList.remove('show'); return; }
   mentionIdx = 0;
   renderMentions(matches);
@@ -276,28 +285,73 @@ input.addEventListener('keydown', (e) => {
 
 function renderMentions(matches) {
   mentionPopup.innerHTML = matches.map((m, i) =>
-    `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-id="${m.id}" data-name="${esc(m.name)}"><span class="role-tag">${m.role}</span> ${esc(m.name)} <span style="color:#666;font-size:11px">(${m.id})</span></div>`
+    `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-id="${m.id}" data-name="${esc(m.name)}"><span class="role-tag">${m.role}</span> ${esc(m.name)}</div>`
   ).join('');
   mentionPopup.querySelectorAll('.mention-item').forEach(el => { el.onclick = () => selectMention(el.dataset.name); });
 }
-
 function highlightMention(items) { items.forEach((el, i) => el.classList.toggle('selected', i === mentionIdx)); }
-
 function selectMention(name) {
-  const val = input.value;
-  const atIdx = val.lastIndexOf('@');
+  const val = input.value; const atIdx = val.lastIndexOf('@');
   input.value = val.slice(0, atIdx) + `@${name} `;
-  mentionPopup.classList.remove('show');
-  input.focus();
+  mentionPopup.classList.remove('show'); input.focus();
 }
 
+// --- Image paste/upload ---
+const imagePreview = document.getElementById('image-preview');
+const fileInput = document.getElementById('file-input');
+let pendingImage = null; // { media_type, data (base64) }
+
+document.addEventListener('paste', (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file) loadImage(file);
+      break;
+    }
+  }
+});
+
+fileInput.onchange = (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); };
+
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const base64 = reader.result.split(',')[1];
+    pendingImage = { media_type: file.type, data: base64 };
+    imagePreview.innerHTML = `<img src="${reader.result}"><span class="remove-img" onclick="clearImage()">✕ remove</span>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() { pendingImage = null; imagePreview.innerHTML = ''; }
+
+// --- Form submit: channel-aware routing ---
+form.onsubmit = (e) => {
+  e.preventDefault();
+  let text = input.value.trim();
+  if (!text && !pendingImage) return;
+
+  // If in a specific agent channel and no @mention, auto-prefix with @agent
+  if (activeChannel !== 'all' && text && !text.startsWith('@')) {
+    const agent = sessions.find(s => s.id === activeChannel);
+    if (agent) text = `@${agent.name} ${text}`;
+  }
+
+  const msg = { type: 'user_message', content: text || '(image)', image: pendingImage };
+  send(msg);
+  input.value = '';
+  clearImage();
+  mentionPopup.classList.remove('show');
+};
+
 document.getElementById('btn-settings').onclick = document.getElementById('btn-toggle-view').onclick = () => { showSettings = !showSettings; toggleView(); if (showSettings) renderSettings(); };
-document.getElementById('btn-add-agent').onclick = () => { send({ type: 'add_agent', config: { id: `worker-${workerCounter++}`, name: '新 Worker', role: 'worker', persona: '' } }); };
+document.getElementById('btn-add-agent').onclick = () => { send({ type: 'add_agent', config: { id: `worker-${workerCounter++}`, name: `Worker ${workerCounter-1}`, role: 'worker', cwd: sessions[0]?.cwd || '', persona: '' } }); };
 document.getElementById('btn-start-all').onclick = () => send({ type: 'start_all' });
 
-form.onsubmit = (e) => { e.preventDefault(); const t = input.value.trim(); if (t) { send({ type: 'user_message', content: t }); input.value = ''; mentionPopup.classList.remove('show'); } };
-
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 connect();
 </script>
 </body>

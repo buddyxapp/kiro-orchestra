@@ -1,7 +1,7 @@
 /**
  * Kiro Orchestra — entry point.
- * Starts web server only. Agents are launched from the browser UI.
  */
+import { resolve } from 'node:path';
 import { createSessionManager } from './sessionManager.js';
 import { startServer } from './wsServer.js';
 import { logger } from './logger.js';
@@ -10,19 +10,47 @@ const PORT = parseInt(process.env.PORT ?? '3000');
 const KIRO_CMD = process.env.KIRO_CMD ?? 'kiro-cli';
 const KIRO_ARGS = (process.env.KIRO_ARGS ?? 'acp --trust-all-tools').split(' ');
 const WORKSPACE = process.env.WORKSPACE ?? process.cwd();
+const ORCHESTRA_DIR = resolve(import.meta.dirname, '..');
 
 function main() {
   logger.info('Starting Kiro Orchestra', { port: PORT, workspace: WORKSPACE });
 
-  const sm = createSessionManager(KIRO_CMD, KIRO_ARGS, WORKSPACE);
+  const sm = createSessionManager(KIRO_CMD, KIRO_ARGS, ORCHESTRA_DIR);
 
-  const defaultPersona = '你是一個工作助理。聽從指揮官和使用者的命令執行任務。你有一個 wiki 目錄可以用來累積知識，有用的資訊請寫入 wiki/ 中的 .md 檔案。';
+  const masterPersona = `You are the Master — a task commander responsible for orchestrating workers.
 
-  sm.addAgent({ id: 'master', name: '指揮官', role: 'master', persona: '你是任務指揮官。收到使用者指令後，分析需要做什麼，分派給可用的 workers。你有一個 wiki 目錄記錄分派歷史和策略。' });
-  sm.addAgent({ id: 'worker-1', name: 'Worker 1', role: 'worker', persona: defaultPersona });
-  sm.addAgent({ id: 'worker-2', name: 'Worker 2', role: 'worker', persona: defaultPersona });
-  sm.addAgent({ id: 'worker-3', name: 'Worker 3', role: 'worker', persona: defaultPersona });
-  sm.addAgent({ id: 'worker-4', name: 'Worker 4', role: 'worker', persona: defaultPersona });
+Your responsibilities:
+1. ANALYZE user requests and break them into concrete, verifiable sub-tasks.
+2. DISPATCH tasks to workers with clear instructions and success criteria.
+3. REVIEW worker results critically. If quality is insufficient, send the task back with specific feedback on what to fix. Do NOT accept sloppy or incomplete work.
+4. GUIDE workers when they are confused — provide context, examples, or constraints they need.
+5. REPORT final results to the user only when ALL tasks meet quality standards.
+
+Rules:
+- Never lower your standards. If a worker skips steps or gives vague output, call it out.
+- Always verify: did the worker actually do what was asked, or did they cut corners?
+- If you're unsure how to break down a task, ask the user for clarification BEFORE dispatching.
+- Keep the user informed of progress, blockers, and decisions.`;
+
+  const workerPersona = `You are a Worker agent. You execute tasks assigned by the Master or the user.
+
+Your responsibilities:
+1. EXECUTE the assigned task completely and precisely. Do not skip steps.
+2. VERIFY your own output before reporting done. Re-read the requirements and check.
+3. ASK for clarification if the task is ambiguous — do not guess and produce wrong output.
+4. REPORT results clearly: what you did, what files you changed, what the outcome is.
+
+Rules:
+- Never say "done" without verifying the result meets the stated criteria.
+- If you encounter an obstacle, report it immediately — don't silently skip it.
+- Follow KIRO.md guidelines: simplicity, surgical changes, goal-driven execution.
+- If the Master sends your work back for revision, fix it properly — don't argue or repeat the same output.`;
+
+  sm.addAgent({ id: 'master', name: 'Master', role: 'master', cwd: WORKSPACE, model: 'auto', persona: masterPersona });
+  sm.addAgent({ id: 'worker-1', name: 'Worker 1', role: 'worker', cwd: WORKSPACE, model: 'auto', persona: workerPersona });
+  sm.addAgent({ id: 'worker-2', name: 'Worker 2', role: 'worker', cwd: WORKSPACE, model: 'auto', persona: workerPersona });
+  sm.addAgent({ id: 'worker-3', name: 'Worker 3', role: 'worker', cwd: WORKSPACE, model: 'auto', persona: workerPersona });
+  sm.addAgent({ id: 'worker-4', name: 'Worker 4', role: 'worker', cwd: WORKSPACE, model: 'auto', persona: workerPersona });
 
   startServer(PORT, sm, WORKSPACE);
 

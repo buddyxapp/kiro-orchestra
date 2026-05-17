@@ -39,7 +39,7 @@ export function parseConfigOptions(result: Record<string, unknown>): ConfigOptio
 }
 
 export type AcpEvent =
-  | { type: 'text'; content: string }
+  | { type: 'text'; content: string; image?: { media_type: string; data: string } }
   | { type: 'thinking' }
   | { type: 'tool_start'; id: string; title: string }
   | { type: 'tool_done'; id: string; title: string; status: 'completed' | 'failed' }
