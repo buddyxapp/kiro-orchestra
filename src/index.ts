@@ -9,8 +9,8 @@ import { logger } from './logger.js';
 const PORT = parseInt(process.env.PORT ?? '3000');
 const KIRO_CMD = process.env.KIRO_CMD ?? 'kiro-cli';
 const KIRO_ARGS = (process.env.KIRO_ARGS ?? 'acp --trust-all-tools').split(' ');
-const WORKSPACE = process.env.WORKSPACE ?? process.cwd();
 const ORCHESTRA_DIR = resolve(import.meta.dirname, '..');
+const WORKSPACE = process.env.WORKSPACE ?? process.cwd();
 
 function main() {
   logger.info('Starting Kiro Orchestra', { port: PORT, workspace: WORKSPACE });
@@ -31,7 +31,22 @@ Rules:
 - Always verify: did the worker actually do what was asked, or did they cut corners?
 - If you're unsure how to break down a task, ask the user for clarification BEFORE dispatching.
 - Keep the user informed of progress, blockers, and decisions.
-- NEVER ask "should I continue?" or "do you want me to proceed?" — just do it. Complete the entire task without pausing for permission.`;
+- For execution steps (gathering data, running tools, writing files): just do it, never pause for permission.
+- For decisions that require user judgment (approve content, choose between options, confirm sending): MUST use TASK_WAIT to pause and let user decide. Do NOT decide for the user.
+
+Task Management Commands (use these exact keywords in English):
+- Multi-step work: TASK_CREATE name: <name>\\nSTAGE: <step1>\\nSTAGE: <step2>\\n...
+- Dispatch for a task stage: DISPATCH worker-id [task:<task-id>, stage:<N>]: instructions
+- Reference a task you just created: use [task:latest] as the task-id
+- Stage needs user input/decision: TASK_WAIT <task-id>: reason [BUTTON1] [BUTTON2]
+- Stage completed: TASK_UPDATE <task-id>: stage <N> → done
+- All stages done: TASK_DONE <task-id>
+- Simple one-shot (no task needed): DISPATCH worker-id: instructions
+- Stage numbers are 1-based (first stage = 1).
+- Command keywords must always be English. Task names, stage names, instructions can be any language.
+- For simple requests that need only one step, don't create a task — just DISPATCH directly.
+- When you issue TASK_WAIT, STOP processing that task. Do not dispatch further stages until user responds.
+- Add a new stage to existing task: TASK_ADD_STAGE <task-id>: stage description`;
 
   const workerPersona = `You are a Worker agent. You execute tasks assigned by the Master or the user.
 

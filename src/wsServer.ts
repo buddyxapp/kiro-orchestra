@@ -8,6 +8,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { type AcpEvent } from './acpProtocol.js';
 import { type SessionManager, type AgentConfig } from './sessionManager.js';
 import { createOrchestrator } from './orchestrator.js';
+import { createTaskStore, type TaskStore } from './taskStore.js';
 import { logger } from './logger.js';
 
 export type ClientMsg =
@@ -19,15 +20,24 @@ export type ClientMsg =
   | { type: 'stop_agent'; id: string }
   | { type: 'cancel_agent'; id: string }
   | { type: 'set_config'; id: string; configId: string; value: string }
-  | { type: 'start_all' };
+  | { type: 'start_all' }
+  | { type: 'task_respond'; taskId: string; content: string }
+  | { type: 'task_archive'; taskId: string }
+  | { type: 'task_delete'; taskId: string }
+  | { type: 'task_reopen'; taskId: string }
+  | { type: 'task_create'; name: string }
+  | { type: 'set_workspace'; cwd: string };
 
 export type ServerMsg =
   | { type: 'agent_event'; agentId: string; event: AcpEvent }
   | { type: 'sessions'; sessions: Array<{ id: string; name: string; role: string; status: string; persona: string; cwd: string }> }
+  | { type: 'tasks'; tasks: unknown[] }
   | { type: 'error'; message: string };
 
 export function startServer(port: number, sm: SessionManager, workspace: string) {
   const publicDir = resolve(import.meta.dirname, '..', 'public');
+  const wikisDir = resolve(import.meta.dirname, '..', 'wikis');
+  const taskStore = createTaskStore(wikisDir);
   const server = createServer((req, res) => {
     const url = req.url === '/' ? '/index.html' : req.url!;
     const filePath = resolve(publicDir, '.' + decodeURIComponent(url.split('?')[0]));
@@ -68,12 +78,19 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
     if (event.type === 'turn_end') broadcastSessions();
   }
 
-  const orch = createOrchestrator(sm, onEvent, broadcastSessions);
+  const orch = createOrchestrator(sm, taskStore, onEvent, broadcastSessions, broadcastTasks);
+
+  function broadcastTasks() {
+    const msg: ServerMsg = { type: 'tasks', tasks: taskStore.getAll() };
+    const data = JSON.stringify(msg);
+    for (const ws of clients) if (ws.readyState === ws.OPEN) ws.send(data);
+  }
 
   wss.on('connection', (ws) => {
     clients.add(ws);
     for (const msg of history) ws.send(JSON.stringify(msg));
     broadcastSessions();
+    ws.send(JSON.stringify({ type: 'tasks', tasks: taskStore.getAll() }));
 
     ws.on('message', async (raw) => {
       try {
@@ -98,6 +115,36 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
             broadcastSessions(); break;
           }
           case 'start_all': for (const s of sm.getAll()) { if (s.status === 'stopped') try { await sm.startAgent(s.config.id); } catch {} } broadcastSessions(); break;
+
+          case 'task_respond': {
+            const task = taskStore.get(msg.taskId);
+            if (!task) break;
+            // Handle action button responses
+            if (msg.content === 'COMPLETE') { taskStore.complete(msg.taskId); broadcastTasks(); break; }
+            if (msg.content === 'CONTINUE') { taskStore.resumeTask(msg.taskId); broadcastTasks(); break; }
+            // Normal response
+            if (task.status === 'waiting') taskStore.resumeTask(msg.taskId);
+            broadcast({ type: 'agent_event', agentId: 'user', event: { type: 'text', content: `[Task "${task.name}"] ${msg.content}` } });
+            orch.pushUserMessage(`[Task "${task.name}"] User responded: ${msg.content}`, undefined, msg.taskId);
+            broadcastTasks(); break;
+          }
+          case 'task_archive': taskStore.complete(msg.taskId); broadcastTasks(); break;
+          case 'task_delete': taskStore.delete(msg.taskId); broadcastTasks(); break;
+          case 'task_reopen': taskStore.reopen(msg.taskId); broadcastTasks(); break;
+          case 'task_create': {
+            // Create task immediately with no stages — user will discuss with Master inside
+            taskStore.create(msg.name, []);
+            broadcastTasks();
+            break;
+          }
+          case 'set_workspace': {
+            for (const s of sm.getAll()) {
+              s.config.cwd = msg.cwd;
+              if (s.status !== 'stopped') sm.stopAgent(s.config.id);
+            }
+            broadcastSessions();
+            break;
+          }
 
           case 'user_message': {
             if (!msg.content && !msg.image) break;

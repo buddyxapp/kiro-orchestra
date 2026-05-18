@@ -60,6 +60,46 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 .activity-item.completed { color: #3fb950; }
 .activity-item.failed { color: #f85149; }
 .activity-idle { font-size: 11px; color: #555; padding-left: 14px; }
+/* Sidebar tabs */
+.sidebar-tabs { display: flex; border-bottom: 1px solid #333; }
+.sidebar-tabs button { flex: 1; padding: 8px; background: none; border: none; color: #888; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; }
+.sidebar-tabs button.active { color: #fff; border-bottom-color: #1164a3; }
+/* Task list */
+.task-item { padding: 8px 16px; cursor: pointer; border-radius: 4px; margin: 2px 8px; }
+.task-item:hover { background: #27242c; }
+.task-item.active { background: #1164a3; }
+.task-item .task-name { font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-item .task-status { font-size: 11px; color: #8b949e; margin-top: 2px; }
+.task-item .task-progress { font-size: 10px; color: #3fb950; margin-top: 2px; }
+.task-section { padding: 6px 16px; font-size: 11px; color: #555; cursor: pointer; }
+.task-new { padding: 8px 16px; cursor: pointer; color: #58a6ff; font-size: 13px; margin: 4px 8px; border-radius: 4px; }
+.task-new:hover { background: #27242c; }
+.task-stages-inline { padding: 2px 16px 8px 28px; }
+.task-stage-inline { font-size: 11px; padding: 2px 0; color: #8b949e; cursor: pointer; }
+.task-stage-inline.done { color: #3fb950; }
+.task-stage-inline.running { color: #f2c744; }
+.task-stage-inline.waiting_user { color: #58a6ff; }
+.task-stage-inline.failed { color: #f85149; }
+.stage-result { display: none; font-size: 10px; color: #666; margin: 2px 0 4px 14px; white-space: pre-wrap; }
+.task-stage-inline.expanded .stage-result { display: block; }
+.task-icons { padding: 6px 0; display: flex; gap: 10px; font-size: 14px; }
+.task-icons span { cursor: pointer; opacity: 0.5; }
+.task-icons span:hover { opacity: 1; }
+.task-wait-actions { padding: 4px 0; }
+.task-action-btn { padding: 3px 8px; border: 1px solid #444; border-radius: 3px; background: #222; color: #fff; font-size: 10px; cursor: pointer; margin: 3px 4px 3px 0; }
+.task-action-btn:hover { background: #1164a3; border-color: #1164a3; }
+/* Stage panel */
+.stage-item { padding: 6px 14px; font-size: 12px; border-left: 3px solid #333; margin: 4px 0; }
+.stage-item.done { border-left-color: #3fb950; color: #3fb950; }
+.stage-item.running { border-left-color: #f2c744; color: #f2c744; }
+.stage-item.waiting_user { border-left-color: #58a6ff; color: #58a6ff; }
+.stage-item.pending { color: #555; }
+.stage-item.failed { border-left-color: #f85149; color: #f85149; }
+/* Task action buttons */
+.task-actions { padding: 10px 14px; border-top: 1px solid #333; }
+.task-actions .wait-reason { font-size: 12px; color: #8b949e; display: block; margin-bottom: 8px; }
+.task-actions button { padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 12px; margin-right: 6px; background: #333; color: #fff; }
+.task-actions button:hover { background: #444; }
 /* Settings */
 .settings { display: none; flex: 1; flex-direction: column; padding: 20px; overflow-y: auto; }
 .settings.show { display: flex; }
@@ -88,6 +128,10 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 
 <div class="sidebar">
   <h1>🎼 Kiro Orchestra</h1>
+  <div class="sidebar-tabs">
+    <button class="tab active" id="tab-chat" onclick="switchMode('chat')">💬 Chat</button>
+    <button class="tab" id="tab-tasks" onclick="switchMode('tasks')">📋 Tasks</button>
+  </div>
   <div class="channels" id="channels"></div>
   <div class="sidebar-btn" id="btn-settings">⚙️ Settings</div>
 </div>
@@ -140,14 +184,18 @@ const logs = { all: [] };
 let workerCounter = 5;
 let mentionIdx = -1;
 const streaming = {};
-// Track current tool activity per agent
-const agentTools = {}; // { agentId: [ {title, status} ] }
+const agentTools = {};
+// Task state
+let mode = 'chat'; // 'chat' or 'tasks'
+let tasks = [];
+let selectedTaskId = null;
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}`);
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'sessions') { sessions = msg.sessions; renderChannels(); renderActivity(); if (showSettings) renderSettings(); }
+    else if (msg.type === 'tasks') { tasks = msg.tasks; if (mode === 'tasks') renderTaskList(); }
     else if (msg.type === 'agent_event') handleEvent(msg.agentId, msg.event);
     else if (msg.type === 'error') showError(msg.message);
   };
@@ -239,7 +287,102 @@ function renderActivity() {
   stopBtn.style.opacity = hasActivity ? '1' : '0.3';
 }
 
+function switchMode(m) {
+  mode = m;
+  document.getElementById('tab-chat').classList.toggle('active', m === 'chat');
+  document.getElementById('tab-tasks').classList.toggle('active', m === 'tasks');
+  showSettings = false;
+  if (m === 'chat') { renderChannels(); renderMessages(); renderActivity(); }
+  else { renderTaskList(); renderActivity(); }
+  settingsEl.classList.remove('show');
+  messagesEl.style.display = 'block';
+  inputArea.style.display = 'block';
+  updateHeader();
+}
+
+function renderTaskList() {
+  const active = tasks.filter(t => t.status !== 'archived');
+  const archived = tasks.filter(t => t.status === 'archived');
+  let html = '';
+  for (const t of active) {
+    const stages = t.stages || [];
+    const done = stages.filter(s => s.status === 'done').length;
+    const statusIcon = t.status === 'waiting' ? '‖' : '◉';
+    const isSelected = t.id === selectedTaskId;
+    html += `<div class="task-item ${isSelected ? 'active' : ''}" onclick="selectTask('${t.id}')">
+      <div class="task-name">${statusIcon} ${esc(t.name)}</div>
+      <div class="task-progress">${'█'.repeat(done)}${'░'.repeat(stages.length - done)} ${done}/${stages.length}</div>
+    </div>`;
+    if (isSelected) {
+      html += `<div class="task-stages-inline">`;
+      stages.forEach((s, i) => {
+        const icon = s.status === 'done' ? '✓' : s.status === 'running' ? '◉' : s.status === 'waiting_user' ? '‖' : s.status === 'failed' ? '✗' : '○';
+        html += `<div class="task-stage-inline ${s.status}" onclick="event.stopPropagation();this.classList.toggle('expanded')">${icon} ${i+1}. ${esc(s.name)}${s.result ? `<div class="stage-result">${esc(s.result)}</div>` : ''}</div>`;
+      });
+      // Waiting actions
+      if (t.status === 'waiting' && t.waitingActions?.length) {
+        html += `<div class="task-wait-actions"><span style="font-size:10px;color:#888;">${esc(t.waitingFor||'')}</span><div>`;
+        for (const a of t.waitingActions) html += `<button class="task-action-btn" onclick="event.stopPropagation();taskRespond('${t.id}','${esc(a)}')">${esc(a)}</button>`;
+        html += `</div></div>`;
+      }
+      // Action icons
+      html += `<div class="task-icons">`;
+      html += `<span title="Archive" onclick="event.stopPropagation();send({type:'task_archive',taskId:'${t.id}'})">📦</span>`;
+      html += `<span title="Delete" onclick="event.stopPropagation();if(confirm('Delete?'))send({type:'task_delete',taskId:'${t.id}'})">🗑</span>`;
+      html += `</div>`;
+      html += `</div>`;
+    }
+  }
+  if (archived.length) {
+    const collapsed = active.length > 0;
+    html += `<div class="task-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">✓ Done (${archived.length})</div><div style="display:${collapsed ? 'none' : 'block'}">`;
+    for (const t of archived) {
+      const isSelected = t.id === selectedTaskId;
+      html += `<div class="task-item ${isSelected ? 'active' : ''}" onclick="selectTask('${t.id}')" style="opacity:0.6"><div class="task-name">✓ ${esc(t.name)}</div></div>`;
+      if (isSelected) {
+        html += `<div class="task-stages-inline">`;
+        (t.stages||[]).forEach((s, i) => {
+          html += `<div class="task-stage-inline done" onclick="event.stopPropagation();this.classList.toggle('expanded')">✓ ${i+1}. ${esc(s.name)}${s.result ? `<div class="stage-result">${esc(s.result)}</div>` : ''}</div>`;
+        });
+        html += `<div class="task-icons">`;
+        html += `<span title="Reopen" onclick="event.stopPropagation();send({type:'task_reopen',taskId:'${t.id}'})">↺</span>`;
+        html += `<span title="Delete" onclick="event.stopPropagation();if(confirm('Delete?'))send({type:'task_delete',taskId:'${t.id}'})">🗑</span>`;
+        html += `</div></div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  html += `<div class="task-new" onclick="newTask()">+ New Task</div>`;
+  channelsEl.innerHTML = html;
+}
+
+function renderTaskStages() {
+  const task = tasks.find(t => t.id === selectedTaskId);
+  if (!task) { activityContent.innerHTML = ''; return; }
+  // Activity panel stays as tool calls — don't change it in tasks mode
+  renderActivity();
+}
+
+function renderTaskDetail() {
+  // Render stages inline in sidebar (already done in renderTaskList)
+  // This function is kept for compatibility
+}
+
+function selectTask(id) { selectedTaskId = id; renderTaskList(); updateHeader(); }
+function newTask() {
+  const name = prompt('Describe the task:');
+  if (!name) return;
+  const master = sessions.find(s => s.id === 'master');
+  if (!master || master.status === 'stopped') { showError('Master is not running. Start it first.'); return; }
+  send({ type: 'task_create', name });
+  // Show placeholder feedback
+  tasks.push({ id: 'pending', name: '⏳ ' + name, status: 'active', stages: [{ name: 'Planning...', status: 'running' }], createdAt: '', updatedAt: '' });
+  renderTaskList();
+}
+function taskRespond(taskId, content) { send({ type: 'task_respond', taskId, content }); }
+
 function renderChannels() {
+  if (mode === 'tasks') { renderTaskList(); return; }
   let html = `<div class="channel ${activeChannel === 'all' ? 'active' : ''}" data-id="all"># all</div>`;
   for (const s of sessions) {
     const cls = activeChannel === s.id ? 'active' : '';
@@ -261,10 +404,16 @@ function renderChannels() {
 }
 
 function updateHeader() {
-  const s = sessions.find(x => x.id === activeChannel);
-  headerTitle.textContent = `# ${s ? s.name : activeChannel}`;
-  if (activeChannel === 'all') targetHint.textContent = 'Sending to: Master (use @ to pick agent)';
-  else targetHint.textContent = `Sending to: ${sessions.find(x => x.id === activeChannel)?.name ?? activeChannel}`;
+  if (mode === 'tasks') {
+    const task = tasks.find(t => t.id === selectedTaskId);
+    headerTitle.textContent = task ? `📋 ${task.name}` : '📋 Tasks';
+    targetHint.textContent = task ? `Responding to task: ${task.name}` : 'Select a task or create new';
+  } else {
+    const s = sessions.find(x => x.id === activeChannel);
+    headerTitle.textContent = `# ${s ? s.name : activeChannel}`;
+    if (activeChannel === 'all') targetHint.textContent = 'Sending to: Master (use @ to pick agent)';
+    else targetHint.textContent = `Sending to: ${sessions.find(x => x.id === activeChannel)?.name ?? activeChannel}`;
+  }
 }
 
 function renderMessages() {
@@ -285,12 +434,11 @@ function renderMessages() {
 }
 
 function renderSettings() {
-  let html = '';
+  let html = `<div class="agent-card"><label>🗂 Workspace Root</label><input id="cfg-workspace" value="${esc(sessions[0]?.cwd || '')}" /><div style="font-size:10px;color:#666;margin-bottom:8px;">All agents work in this directory. Restart required after change.</div><div class="actions"><button class="btn-save" onclick="saveWorkspace()">💾 Save</button></div></div>`;
   for (const s of sessions) {
     html += `<div class="agent-card" data-id="${s.id}">
       <label>${s.role === 'master' ? '👑 Master' : '👷 Worker'} <span class="status-badge ${s.status}">${s.status}</span></label>
       <label>Name</label><input class="cfg-name" value="${esc(s.name)}" />
-      <label>Working Directory</label><input class="cfg-cwd" value="${esc(s.cwd)}" />
       ${s.configOptions?.length ? s.configOptions.map(opt => `<label>${esc(opt.name)} <span style="color:#f2c744;font-size:10px">(restarts agent)</span></label><select class="cfg-option" data-config-id="${opt.id}" data-agent-id="${s.id}">${opt.options.map(o => `<option value="${esc(o.value)}" ${o.value === (s.model || opt.currentValue) ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`).join('') : (s.status !== 'stopped' ? '' : '')}
       <label>Persona</label><textarea class="cfg-persona">${esc(s.persona)}</textarea>
       <div class="actions">
@@ -318,8 +466,19 @@ function send(msg) { if (ws?.readyState === 1) ws.send(JSON.stringify(msg)); }
 
 function saveAgent(id, btn) {
   const card = btn.closest('.agent-card');
-  send({ type: 'update_agent', id, name: card.querySelector('.cfg-name').value.trim(), persona: card.querySelector('.cfg-persona').value.trim(), cwd: card.querySelector('.cfg-cwd').value.trim() });
+  send({ type: 'update_agent', id, name: card.querySelector('.cfg-name').value.trim(), persona: card.querySelector('.cfg-persona').value.trim() });
   btn.textContent = '✅'; setTimeout(() => btn.textContent = '💾 Save', 1500);
+}
+function saveWorkspace() {
+  const cwd = document.getElementById('cfg-workspace').value.trim();
+  if (!cwd) return;
+  const wasRunning = sessions.some(s => s.status !== 'stopped');
+  send({ type: 'set_workspace', cwd });
+  const btn = document.querySelector('#cfg-workspace').closest('.agent-card').querySelector('.btn-save');
+  btn.textContent = '✅'; setTimeout(() => btn.textContent = '💾 Save', 1500);
+  if (wasRunning) {
+    setTimeout(() => { if (confirm('Workspace changed. Restart all agents?')) send({ type: 'start_all' }); }, 500);
+  }
 }
 function startAgent(id, btn) { if (btn) { btn.disabled = true; btn.textContent = '⏳...'; } send({ type: 'start_agent', id }); }
 function stopAgent(id) { send({ type: 'stop_agent', id }); }
@@ -364,14 +523,21 @@ form.onsubmit = (e) => {
   e.preventDefault();
   let text = input.value.trim();
   if (!text && !pendingImage) return;
+
+  // Task mode: send as task_respond
+  if (mode === 'tasks' && selectedTaskId) {
+    send({ type: 'task_respond', taskId: selectedTaskId, content: text });
+    input.value = ''; clearImage(); return;
+  }
+
   if (activeChannel !== 'all' && text && !text.startsWith('@')) { const a = sessions.find(s => s.id === activeChannel); if (a) text = `@${a.name} ${text}`; }
   send({ type: 'user_message', content: text || '(image)', image: pendingImage });
   input.value = ''; clearImage(); mentionPopup.classList.remove('show');
 };
 
 document.getElementById('btn-settings').onclick = () => { showSettings = !showSettings; toggleView(); if (showSettings) renderSettings(); };
-document.getElementById('btn-add-agent').onclick = () => { const defaultPersona = 'You are a work assistant. Follow commands from the Master and the user. You have a wiki directory to accumulate knowledge — save useful info as .md files.'; send({ type: 'add_agent', config: { id: `worker-${workerCounter++}`, name: `Worker ${workerCounter-1}`, role: 'worker', cwd: sessions[0]?.cwd || '', model: 'auto', persona: defaultPersona } }); };
-document.getElementById('btn-start-all').onclick = () => send({ type: 'start_all' });
+document.getElementById('btn-add-agent').onclick = (e) => { const btn = e.target; const defaultPersona = 'You are a work assistant. Follow commands from the Master and the user. You have a wiki directory to accumulate knowledge — save useful info as .md files.'; send({ type: 'add_agent', config: { id: `worker-${workerCounter++}`, name: `Worker ${workerCounter-1}`, role: 'worker', cwd: sessions[0]?.cwd || '', model: 'auto', persona: defaultPersona } }); btn.textContent = '✅ Added'; setTimeout(() => btn.textContent = '+ Add Worker', 1500); };
+document.getElementById('btn-start-all').onclick = (e) => { const btn = e.target; send({ type: 'start_all' }); btn.textContent = '⏳ Starting...'; btn.disabled = true; setTimeout(() => { btn.textContent = '🚀 Start All'; btn.disabled = false; }, 5000); };
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function linkify(s) {
@@ -383,6 +549,24 @@ function linkify(s) {
   });
   // Plain URLs (http, https, file)
   out = out.replace(/(?<!["=])((?:https?|file):\/\/[^\s<"']+)/g, '<a href="$1" target="_blank" style="color:#58a6ff;">$1</a>');
+  // Markdown formatting
+  out = out.replace(/^### (.+)$/gm, '<strong style="font-size:14px;color:#fff;">$1</strong>');
+  out = out.replace(/^## (.+)$/gm, '<strong style="font-size:15px;color:#fff;">$1</strong>');
+  out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #333;margin:8px 0;">');
+  // Code blocks
+  out = out.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:#161b22;border:1px solid #333;border-radius:6px;padding:8px;margin:4px 0;font-size:12px;overflow-x:auto;">$2</pre>');
+  // Inline code
+  out = out.replace(/`([^`]+)`/g, '<code style="background:#161b22;padding:1px 4px;border-radius:3px;font-size:12px;">$1</code>');
+  // Tables (simple: detect | rows and wrap in a styled div)
+  out = out.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/gm, (_, header, sep, body) => {
+    const headers = header.split('|').filter(c => c.trim()).map(c => `<th style="padding:4px 8px;border:1px solid #333;font-size:11px;background:#161b22;">${c.trim()}</th>`).join('');
+    const rows = body.trim().split('\n').map(row => {
+      const cells = row.split('|').filter(c => c.trim()).map(c => `<td style="padding:4px 8px;border:1px solid #333;font-size:11px;">${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    return `<table style="border-collapse:collapse;margin:4px 0;"><tr>${headers}</tr>${rows}</table>`;
+  });
   return out;
 }
 connect();
