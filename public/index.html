@@ -376,8 +376,11 @@ document.getElementById('btn-start-all').onclick = () => send({ type: 'start_all
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function linkify(s) {
   let out = esc(s);
-  // Markdown links: [text](url)
-  out = out.replace(/\[([^\]]+)\]\(([^\s)]+)\)/g, '<a href="$2" target="_blank" style="color:#58a6ff;">$1</a>');
+  // Markdown links: [text](url) — only safe protocols
+  out = out.replace(/\[([^\]]+)\]\(([^\s)]+)\)/g, (_, text, url) => {
+    if (!/^https?:\/\/|^file:\/\/\//i.test(url)) return `${text} (${url})`;
+    return `<a href="${url}" target="_blank" style="color:#58a6ff;">${text}</a>`;
+  });
   // Plain URLs (http, https, file)
   out = out.replace(/(?<!["=])((?:https?|file):\/\/[^\s<"']+)/g, '<a href="$1" target="_blank" style="color:#58a6ff;">$1</a>');
   return out;

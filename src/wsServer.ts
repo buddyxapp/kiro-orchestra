@@ -41,7 +41,7 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
     } catch { res.writeHead(404); res.end('Not found'); }
   });
 
-  const wss = new WebSocketServer({ server });
+  const wss = new WebSocketServer({ server, maxPayload: 10 * 1024 * 1024 }); // 10MB limit
   const clients = new Set<WebSocket>();
   const MAX_HISTORY = 2000;
   const history: ServerMsg[] = [];
