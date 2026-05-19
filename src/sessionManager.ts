@@ -108,17 +108,8 @@ export function createSessionManager(command: string, args: string[], orchestraD
       const s = sessions.get(id);
       if (!s || !s.backend) return;
       s.backend.cancel();
+      s.status = 'idle';
       logger.info(`Cancelled: ${s.config.name} (${id})`);
-      // Force kill if still working after 5s
-      const backend = s.backend;
-      setTimeout(() => {
-        if (s.backend === backend && s.status === 'working') {
-          logger.warn(`Force-killing unresponsive agent: ${s.config.name} (${id})`);
-          s.backend?.stop();
-          s.backend = null;
-          s.status = 'stopped';
-        }
-      }, 5000);
     },
 
     async setConfigOption(id: string, configId: string, value: string) {
