@@ -39,6 +39,29 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
   const wikisDir = resolve(import.meta.dirname, '..', 'wikis');
   const taskStore = createTaskStore(wikisDir);
   const server = createServer((req, res) => {
+    // API: execute action from external HTML reports
+    if (req.url === '/api/execute' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (c: Buffer) => { body += c.toString(); });
+      req.on('end', () => {
+        try {
+          const { content } = JSON.parse(body);
+          if (content) {
+            broadcast({ type: 'agent_event', agentId: 'user', event: { type: 'text', content } });
+            orch.pushUserMessage(content);
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end('{"ok":true}');
+        } catch { res.writeHead(400); res.end('{"error":"invalid json"}'); }
+      });
+      return;
+    }
+    // CORS preflight for /api/execute
+    if (req.url === '/api/execute' && req.method === 'OPTIONS') {
+      res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' });
+      res.end(); return;
+    }
+
     const url = req.url === '/' ? '/index.html' : req.url!;
     const filePath = resolve(publicDir, '.' + decodeURIComponent(url.split('?')[0]));
     if (!filePath.startsWith(publicDir + (process.platform === 'win32' ? '\\' : '/'))) { res.writeHead(403); res.end(); return; }

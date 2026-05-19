@@ -73,21 +73,23 @@ code { background: #161b22; padding: 2px 6px; border-radius: 4px; color: #79c0ff
   <div class="layer layer-browser">
     <div class="layer-title">BROWSER</div>
     <div class="row">
-      <div class="box ui"><div class="box-title">Slack-like UI</div><div class="box-desc">Sidebar • Chat • Activity Panel<br>@mention • Settings • Image paste</div></div>
+      <div class="box ui"><div class="box-title">Slack-like UI</div><div class="box-desc">Chat mode • Task mode<br>@mention • Activity Panel</div></div>
+      <div class="box" style="border-color:#3fb950;"><div class="box-title" style="color:#3fb950;">HTML Reports</div><div class="box-desc">Action items + Execute buttons<br>→ POST /api/execute</div></div>
     </div>
-    <div class="box-desc" style="text-align:center;margin-top:8px;color:#58a6ff;">http://localhost:3000</div>
+    <div class="box-desc" style="text-align:center;margin-top:8px;color:#58a6ff;">http://localhost:3000 + local file:// reports</div>
   </div>
 
   <div class="connector"></div>
-  <div class="connector-label">WebSocket (real-time streaming)</div>
+  <div class="connector-label">WebSocket + HTTP API</div>
   <div class="connector"></div>
 
   <!-- Server Layer -->
   <div class="layer layer-server">
     <div class="layer-title">NODE.JS SERVER</div>
     <div class="row">
-      <div class="box orch"><div class="box-title">Orchestrator</div><div class="box-desc">Event inbox • Debounce<br>DISPATCH parser • Wiki save</div></div>
-      <div class="box" style="border-color:#8b949e;"><div class="box-title" style="color:#8b949e;">Session Manager</div><div class="box-desc">Start • Stop • Cancel<br>Config • Model switch</div></div>
+      <div class="box orch"><div class="box-title">Orchestrator</div><div class="box-desc">Event inbox • Task commands<br>Scope guard • Debounce</div></div>
+      <div class="box" style="border-color:#f2c744;"><div class="box-title" style="color:#f2c744;">Task Store</div><div class="box-desc">projects.json • CRUD<br>Stages • Waiting • Archive</div></div>
+      <div class="box" style="border-color:#8b949e;"><div class="box-title" style="color:#8b949e;">Session Manager</div><div class="box-desc">Start • Stop • Cancel<br>Model switch • onClose</div></div>
     </div>
   </div>
 
@@ -99,13 +101,27 @@ code { background: #161b22; padding: 2px 6px; border-radius: 4px; color: #79c0ff
   <div class="layer layer-kiro">
     <div class="layer-title">KIRO-CLI PROCESSES</div>
     <div class="row">
-      <div class="box master"><div class="box-title">👑 Master</div><div class="box-desc">Dispatches tasks<br>Monitors results</div></div>
+      <div class="box master"><div class="box-title">👑 Master</div><div class="box-desc">Dispatches tasks<br>Reviews results • TASK_* commands</div></div>
       <div class="box worker"><div class="box-title">👷 Worker 1</div><div class="box-desc">Executes tasks</div></div>
       <div class="box worker"><div class="box-title">👷 Worker 2</div><div class="box-desc">Executes tasks</div></div>
       <div class="box worker"><div class="box-title">👷 Worker 3</div><div class="box-desc">Executes tasks</div></div>
       <div class="box worker"><div class="box-title">👷 Worker 4</div><div class="box-desc">Executes tasks</div></div>
     </div>
     <div class="box-desc" style="text-align:center;margin-top:10px;color:#3fb950;">Each agent: full MCP tools (Salesforce, Outlook, AWS) + file system + shell</div>
+  </div>
+
+  <div class="connector"></div>
+  <div class="connector-label">File system</div>
+  <div class="connector"></div>
+
+  <!-- Memory Layer -->
+  <div class="layer" style="border-color:#a371f7;">
+    <div class="layer-title" style="color:#a371f7;">PERSISTENT MEMORY</div>
+    <div class="row">
+      <div class="box" style="border-color:#a371f7;"><div class="box-title" style="color:#a371f7;">LLM Wiki</div><div class="box-desc">wikis/master/reports/<br>Per-task folders • Summaries</div></div>
+      <div class="box" style="border-color:#a371f7;"><div class="box-title" style="color:#a371f7;">Task State</div><div class="box-desc">wikis/projects.json<br>Stages • Status • Crash recovery</div></div>
+      <div class="box" style="border-color:#a371f7;"><div class="box-title" style="color:#a371f7;">KIRO.md</div><div class="box-desc">Shared behavior rules<br>All agents follow on startup</div></div>
+    </div>
   </div>
 </div>
 
@@ -129,32 +145,81 @@ code { background: #161b22; padding: 2px 6px; border-radius: 4px; color: #79c0ff
   <div class="flow-step">🔄 Loop until DONE</div>
 </div>
 
+<h2>Memory System (LLM Wiki)</h2>
+
+<div class="flow">
+  <div class="flow-step">Worker completes task</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">Result > 300 chars?</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step highlight">Save to wikis/master/reports/&lt;task-id&gt;/</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">Master gets summary only</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">Reads full file when needed</div>
+</div>
+
+<table>
+<tr><th>What</th><th>Where</th><th>Survives restart</th></tr>
+<tr><td>Task state (stages, status)</td><td><code>wikis/projects.json</code></td><td>✓ Yes</td></tr>
+<tr><td>Worker reports (long results)</td><td><code>wikis/master/reports/&lt;task-id&gt;/*.md</code></td><td>✓ Yes</td></tr>
+<tr><td>Behavior rules</td><td><code>KIRO.md</code></td><td>✓ Yes</td></tr>
+<tr><td>Chat history</td><td>Server memory (2000 msgs)</td><td>✗ Lost on restart</td></tr>
+<tr><td>Agent session context</td><td>kiro-cli internal</td><td>✗ Lost on restart</td></tr>
+</table>
+
+<h2>HTML Report → Execute Flow</h2>
+
+<div class="flow">
+  <div class="flow-step">Master generates HTML report</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">User opens report (file://)</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">Checks items + picks actions</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step highlight">Clicks ▶ Execute</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">POST /api/execute</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step">Master receives + dispatches</div>
+</div>
+
+<table>
+<tr><th>Component</th><th>Role</th></tr>
+<tr><td><code>report-template.html</code></td><td>Template for Master to follow when generating reports</td></tr>
+<tr><td><code>orchestra.js</code> (inline)</td><td>Reads checkboxes, POSTs selected items to Orchestra</td></tr>
+<tr><td><code>/api/execute</code></td><td>HTTP endpoint that feeds into orchestrator inbox</td></tr>
+</table>
+
 <h2>Features</h2>
 
 <div class="features">
-  <div class="feature"><div class="feature-icon">⚡</div><div class="feature-title">Parallel Execution</div><div class="feature-desc">Multiple workers run tasks simultaneously</div></div>
-  <div class="feature"><div class="feature-icon">🧠</div><div class="feature-title">Event-Driven Master</div><div class="feature-desc">Stays responsive while workers are busy. Accepts new input anytime.</div></div>
-  <div class="feature"><div class="feature-icon">📚</div><div class="feature-title">LLM Wiki (per agent)</div><div class="feature-desc">Persistent knowledge that compounds over time. Long results saved to files.</div></div>
-  <div class="feature"><div class="feature-icon">🎯</div><div class="feature-title">@mention Routing</div><div class="feature-desc">Direct messages to specific agents or broadcast to all</div></div>
-  <div class="feature"><div class="feature-icon">🤖</div><div class="feature-title">Model Selection</div><div class="feature-desc">Each agent can use a different AI model (Opus, Sonnet, Haiku, etc.)</div></div>
-  <div class="feature"><div class="feature-icon">⏸️</div><div class="feature-title">Cancel Anytime</div><div class="feature-desc">Stop individual agents or interrupt everything with one click</div></div>
-  <div class="feature"><div class="feature-icon">🔌</div><div class="feature-title">Full MCP Access</div><div class="feature-desc">Every agent has Salesforce, Outlook, AWS CLI, and all configured tools</div></div>
-  <div class="feature"><div class="feature-icon">📷</div><div class="feature-title">Image Paste</div><div class="feature-desc">Ctrl+V screenshots directly into chat. Agents analyze via read tool.</div></div>
+  <div class="feature"><div class="feature-icon">📋</div><div class="feature-title">Task View</div><div class="feature-desc">Multi-step tasks with stages, progress tracking, approve/reopen/archive. Scope guard prevents cross-task interference.</div></div>
+  <div class="feature"><div class="feature-icon">🧠</div><div class="feature-title">Event-Driven Master</div><div class="feature-desc">Stays responsive while workers are busy. Accepts new input anytime. Manages multiple concurrent tasks.</div></div>
+  <div class="feature"><div class="feature-icon">📚</div><div class="feature-title">LLM Wiki (Memory)</div><div class="feature-desc">Per-task report folders. Long results saved to .md files. Master sees summaries, reads full files when needed. Survives restart.</div></div>
+  <div class="feature"><div class="feature-icon">📄</div><div class="feature-title">HTML Report Execute</div><div class="feature-desc">Reports with action buttons. User checks items → clicks Execute → Orchestra processes. Works from local file:// pages.</div></div>
+  <div class="feature"><div class="feature-icon">⚡</div><div class="feature-title">Parallel Execution</div><div class="feature-desc">Multiple workers run tasks simultaneously. Each can use a different AI model.</div></div>
+  <div class="feature"><div class="feature-icon">🎯</div><div class="feature-title">@mention Routing</div><div class="feature-desc">Direct messages to specific agents, broadcast to all, or channel-aware auto-routing.</div></div>
+  <div class="feature"><div class="feature-icon">⏸️</div><div class="feature-title">Cancel & Control</div><div class="feature-desc">Stop button, per-agent cancel, TASK_WAIT for user decisions. Master can't close tasks without user approval.</div></div>
+  <div class="feature"><div class="feature-icon">📷</div><div class="feature-title">Image Paste</div><div class="feature-desc">Ctrl+V screenshots into chat. Saved to file, agents analyze via read tool.</div></div>
   <div class="feature"><div class="feature-icon">📊</div><div class="feature-title">Activity Panel</div><div class="feature-desc">Right-side panel shows real-time tool calls per agent. Chat stays clean.</div></div>
-  <div class="feature"><div class="feature-icon">🏠</div><div class="feature-title">100% Local</div><div class="feature-desc">Runs on localhost. No external services. No API keys beyond kiro-cli.</div></div>
+  <div class="feature"><div class="feature-icon">🏠</div><div class="feature-title">100% Local</div><div class="feature-desc">Runs on localhost. No external services. No API keys beyond kiro-cli. All data in wikis/ (gitignored).</div></div>
 </div>
 
 <h2>User Controls</h2>
 <table>
 <tr><th>Action</th><th>How</th></tr>
-<tr><td>Talk to Master</td><td>Just type (no @)</td></tr>
+<tr><td>Talk to Master</td><td>Just type (no @) in Chat tab</td></tr>
 <tr><td>Talk to specific agent</td><td><code>@Worker 1 do this</code> or click its channel</td></tr>
-<tr><td>Broadcast to all</td><td><code>@all hello</code></td></tr>
-<tr><td>Interrupt everything</td><td>Type <code>stop</code></td></tr>
+<tr><td>Create a task</td><td>Tasks tab → + New Task → name it → discuss with Master</td></tr>
+<tr><td>Respond to task</td><td>Click task → type in input or click action buttons (APPROVE/CONTINUE)</td></tr>
+<tr><td>Archive/Reopen/Delete task</td><td>Click task → icons at bottom of stages</td></tr>
+<tr><td>Execute from HTML report</td><td>Open report → check items → click ▶ Execute</td></tr>
+<tr><td>Interrupt everything</td><td>Type <code>stop</code> or click ⏹ button</td></tr>
 <tr><td>Cancel one agent</td><td>Click ⏸ next to it in sidebar</td></tr>
 <tr><td>Change model</td><td>Settings → dropdown (restarts agent)</td></tr>
-<tr><td>Change working dir</td><td>Settings → cwd field → Save</td></tr>
-<tr><td>Paste image</td><td>Ctrl+V or 📎 button — agent reads the saved file</td></tr>
+<tr><td>Change workspace</td><td>Settings → Workspace Root → Save (restarts agents)</td></tr>
+<tr><td>Paste image</td><td>Ctrl+V or 📎 button</td></tr>
 </table>
 
 <h2>Quick Start</h2>
