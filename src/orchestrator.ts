@@ -46,6 +46,28 @@ export function createOrchestrator(
 
   setInterval(() => { roundsThisMinute = 0; }, 60000);
 
+  // Heartbeat: periodic check for stuck/missed dispatches
+  const HEARTBEAT_INTERVAL = 5 * 60 * 1000;
+  setInterval(() => {
+    const master = sm.get('master');
+    if (!master || master.status !== 'idle' || inbox.length > 0 || processing) return;
+    const hasIdleWorker = sm.getAll().some(s => s.config.role === 'worker' && s.status === 'idle');
+    const needsAttention = taskStore.getActive().some(t =>
+      t.stages.some(s => {
+        if (s.status === 'pending' && hasIdleWorker) return true;
+        if (s.status === 'running' && s.assignedTo) {
+          const w = sm.get(s.assignedTo);
+          return !w || w.status !== 'working';
+        }
+        return false;
+      })
+    );
+    if (needsAttention) {
+      inbox.push({ timestamp: now(), from: 'system', summary: 'Heartbeat: pending tasks with idle workers, or running tasks appear stuck. Check and dispatch.' });
+      scheduleWake();
+    }
+  }, HEARTBEAT_INTERVAL);
+
   function now() { return new Date().toISOString().slice(11, 19); }
 
   function saveToWiki(agentId: string, content: string, label: string, taskId?: string): string {
@@ -172,6 +194,10 @@ export function createOrchestrator(
                 onBroadcastTasks();
               }
               executeWorker(cmd.workerId, cmd.instructions, taskId, cmd.stageIndex);
+            } else {
+              // ACK failure — worker unavailable, notify Master
+              inbox.push({ timestamp: now(), from: 'system', summary: `⚠️ DISPATCH failed: ${cmd.workerId} is ${worker?.status ?? 'not found'}. Please reassign.`, taskId });
+              scheduleWake();
             }
             break;
           }
