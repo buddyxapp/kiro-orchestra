@@ -25,11 +25,13 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .header { padding: 10px 20px; border-bottom: 1px solid #333; font-weight: bold; font-size: 14px; }
 .messages { flex: 1; overflow-y: auto; padding: 16px 20px; }
-.msg { margin-bottom: 14px; }
-.msg .author { font-weight: bold; font-size: 14px; margin-bottom: 3px; }
+.msg { margin-bottom: 16px; padding: 8px 12px; border-radius: 8px; }
+.msg.user-msg { background: #1a2a3a; }
+.msg .author { font-weight: bold; font-size: 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
 .msg .author.user { color: #4fc3f7; }
 .msg .author.master { color: #f2c744; }
 .msg .author.worker { color: #2bac76; }
+.msg .task-badge { font-size: 10px; background: #333; color: #8b949e; padding: 2px 6px; border-radius: 3px; font-weight: normal; }
 .msg .text { font-size: 13px; white-space: pre-wrap; line-height: 1.5; }
 .msg .divider { border-bottom: 1px solid #333; margin: 8px 0; }
 .input-area { padding: 10px 20px; border-top: 1px solid #333; position: relative; }
@@ -189,6 +191,7 @@ const agentTools = {};
 let mode = 'chat'; // 'chat' or 'tasks'
 let tasks = [];
 let selectedTaskId = null;
+const taskLogs = {}; // { taskId: [entries] }
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}`);
@@ -196,14 +199,23 @@ function connect() {
     const msg = JSON.parse(e.data);
     if (msg.type === 'sessions') { sessions = msg.sessions; renderChannels(); renderActivity(); if (showSettings) renderSettings(); }
     else if (msg.type === 'tasks') { tasks = msg.tasks; if (mode === 'tasks') renderTaskList(); }
-    else if (msg.type === 'agent_event') handleEvent(msg.agentId, msg.event);
+    else if (msg.type === 'agent_event') handleEvent(msg.agentId, msg.event, msg.taskId);
     else if (msg.type === 'error') showError(msg.message);
   };
   ws.onclose = () => setTimeout(connect, 2000);
 }
 
-function handleEvent(agentId, event) {
+function handleEvent(agentId, event, taskId) {
   if (!logs[agentId]) logs[agentId] = [];
+
+  // Store in taskLogs if tagged — don't duplicate in main chat
+  if (taskId && event.type === 'text') {
+    if (!taskLogs[taskId]) taskLogs[taskId] = [];
+    taskLogs[taskId].push({ agentId, event });
+    if (mode === 'tasks' && selectedTaskId === taskId) renderTaskMessages();
+    // User messages still show in #all; Master/Worker task-tagged messages don't (streaming already showed them)
+    if (agentId !== 'user') return;
+  }
 
   // Track tools in activity panel
   if (event.type === 'tool_start') {
@@ -226,7 +238,7 @@ function handleEvent(agentId, event) {
     renderActivity();
     const entry = { agentId, event };
     logs.all.push(entry); logs[agentId].push(entry);
-    if (!showSettings) renderMessages();
+    if (!showSettings && mode === 'chat') renderMessages();
     return;
   }
 
@@ -260,7 +272,7 @@ function handleEvent(agentId, event) {
     const entry = { agentId, event };
     logs.all.push(entry); logs[agentId].push(entry);
   }
-  if (!showSettings) renderMessages();
+  if (!showSettings && mode === 'chat') renderMessages();
 }
 
 function renderActivity() {
@@ -368,7 +380,34 @@ function renderTaskDetail() {
   // This function is kept for compatibility
 }
 
-function selectTask(id) { selectedTaskId = id; renderTaskList(); updateHeader(); }
+function selectTask(id) { selectedTaskId = id; renderTaskList(); updateHeader(); renderTaskMessages(); }
+
+function renderTaskMessages() {
+  if (!selectedTaskId) { messagesEl.innerHTML = '<div style="padding:20px;color:#555;">Select a task to see its conversation</div>'; return; }
+  const entries = taskLogs[selectedTaskId] || [];
+  let html = '';
+  for (const { agentId, event } of entries) {
+    const s = sessions.find(x => x.id === agentId);
+    const label = s ? s.name : agentId;
+    const role = agentId === 'user' ? 'user' : (s?.role === 'master' ? 'master' : 'worker');
+    const icon = role === 'user' ? '👤 ' : role === 'master' ? '👑 ' : '👷 ';
+    if (event.type === 'text') {
+      const msgClass = role === 'user' ? 'msg user-msg' : 'msg';
+      let content = event.content || '';
+      let badge = '';
+      const taskNameMatch = content.match(/^\[Task "(.+?)"\]\s*/);
+      if (taskNameMatch) { badge = `<span class="task-badge">${esc(taskNameMatch[1])}</span>`; content = content.slice(taskNameMatch[0].length); }
+      const taskIdMatch = content.match(/^\[task:([\w-]+)\]\s*/);
+      if (taskIdMatch) { const t = tasks.find(x => x.id === taskIdMatch[1]); badge = badge || `<span class="task-badge">${t ? esc(t.name) : taskIdMatch[1]}</span>`; content = content.slice(taskIdMatch[0].length); }
+      content = linkify(content);
+      content = content.replace(/\[task:([\w-]+)\]/g, (_, id) => { const t = tasks.find(x => x.id === id); return `<span class="task-badge">${t ? esc(t.name) : id}</span>`; });
+      html += `<div class="${msgClass}"><div class="author ${role}">${icon}${esc(label)} ${badge}</div><div class="text">${content}</div></div>`;
+    }
+  }
+  if (!html) html = '<div style="padding:20px;color:#555;">No conversation yet for this task</div>';
+  messagesEl.innerHTML = html;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
 function newTask() {
   const name = prompt('Describe the task:');
   if (!name) return;
@@ -427,7 +466,22 @@ function renderMessages() {
     const label = s ? s.name : agentId;
     const role = agentId === 'user' ? 'user' : agentId === 'system' ? 'user' : (s?.role === 'master' ? 'master' : 'worker');
     const icon = role === 'user' ? '👤 ' : role === 'master' ? '👑 ' : '👷 ';
-    if (event.type === 'text') html += `<div class="msg"><div class="author ${role}">${icon}${esc(label)}</div><div class="text">${linkify(event.content)}${event.image ? `<br><img src="data:${event.image.media_type};base64,${event.image.data}" style="max-width:400px;max-height:300px;border-radius:8px;margin-top:6px;">` : ''}</div></div>`;
+    if (event.type === 'text') {
+      const msgClass = role === 'user' ? 'msg user-msg' : 'msg';
+      // Extract task badge from content and put in author line
+      let content = event.content || '';
+      let badge = '';
+      // [Task "name"] prefix
+      const taskNameMatch = content.match(/^\[Task "(.+?)"\]\s*/);
+      if (taskNameMatch) { badge = `<span class="task-badge">${esc(taskNameMatch[1])}</span>`; content = content.slice(taskNameMatch[0].length); }
+      // [task:ID] on its own line
+      const taskIdMatch = content.match(/^\[task:([\w-]+)\]\s*/);
+      if (taskIdMatch) { const t = tasks.find(x => x.id === taskIdMatch[1]); badge = badge || `<span class="task-badge">${t ? esc(t.name) : taskIdMatch[1]}</span>`; content = content.slice(taskIdMatch[0].length); }
+      content = linkify(content);
+      // Also convert remaining [task:ID] in body
+      content = content.replace(/\[task:([\w-]+)\]/g, (_, id) => { const t = tasks.find(x => x.id === id); return `<span class="task-badge">${t ? esc(t.name) : id}</span>`; });
+      html += `<div class="${msgClass}"><div class="author ${role}">${icon}${esc(label)} ${badge}</div><div class="text">${content}${event.image ? `<br><img src="data:${event.image.media_type};base64,${event.image.data}" style="max-width:400px;max-height:300px;border-radius:8px;margin-top:6px;">` : ''}</div></div>`;
+    }
     else if (event.type === 'turn_end') html += `<div class="msg"><div class="divider"></div></div>`;
   }
   messagesEl.innerHTML = html;
@@ -527,7 +581,7 @@ form.onsubmit = (e) => {
 
   // Task mode: send as task_respond
   if (mode === 'tasks' && selectedTaskId) {
-    send({ type: 'task_respond', taskId: selectedTaskId, content: text });
+    send({ type: 'task_respond', taskId: selectedTaskId, content: text || '(image)', image: pendingImage });
     input.value = ''; clearImage(); return;
   }
 

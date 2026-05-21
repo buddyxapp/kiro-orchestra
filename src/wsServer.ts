@@ -21,7 +21,7 @@ export type ClientMsg =
   | { type: 'cancel_agent'; id: string }
   | { type: 'set_config'; id: string; configId: string; value: string }
   | { type: 'start_all' }
-  | { type: 'task_respond'; taskId: string; content: string }
+  | { type: 'task_respond'; taskId: string; content: string; image?: { media_type: string; data: string } }
   | { type: 'task_archive'; taskId: string }
   | { type: 'task_delete'; taskId: string }
   | { type: 'task_reopen'; taskId: string }
@@ -29,7 +29,7 @@ export type ClientMsg =
   | { type: 'set_workspace'; cwd: string };
 
 export type ServerMsg =
-  | { type: 'agent_event'; agentId: string; event: AcpEvent }
+  | { type: 'agent_event'; agentId: string; event: AcpEvent; taskId?: string }
   | { type: 'sessions'; sessions: Array<{ id: string; name: string; role: string; status: string; persona: string; cwd: string }> }
   | { type: 'tasks'; tasks: unknown[] }
   | { type: 'error'; message: string };
@@ -101,7 +101,17 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
     if (event.type === 'turn_end') broadcastSessions();
   }
 
-  const orch = createOrchestrator(sm, taskStore, onEvent, broadcastSessions, broadcastTasks);
+  function onTaskEvent(taskId: string, agentId: string, content: string) {
+    // Send as task-tagged event (not duplicated in #all chat — streaming already showed it)
+    const msg: ServerMsg = { type: 'agent_event', agentId, event: { type: 'text', content }, taskId };
+    const data = JSON.stringify(msg);
+    for (const ws of clients) if (ws.readyState === ws.OPEN) ws.send(data);
+    // Store in history for replay on refresh
+    history.push(msg);
+    if (history.length > MAX_HISTORY) history.shift();
+  }
+
+  const orch = createOrchestrator(sm, taskStore, onEvent, onTaskEvent, broadcastSessions, broadcastTasks);
 
   function broadcastTasks() {
     const msg: ServerMsg = { type: 'tasks', tasks: taskStore.getAll() };
@@ -147,8 +157,8 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
             if (msg.content === 'CONTINUE') { taskStore.resumeTask(msg.taskId); broadcastTasks(); break; }
             // Normal response
             if (task.status === 'waiting') taskStore.resumeTask(msg.taskId);
-            broadcast({ type: 'agent_event', agentId: 'user', event: { type: 'text', content: `[Task "${task.name}"] ${msg.content}` } });
-            orch.pushUserMessage(`[Task "${task.name}"] User responded: ${msg.content}`, undefined, msg.taskId);
+            broadcast({ type: 'agent_event', agentId: 'user', event: { type: 'text', content: `[Task "${task.name}"] ${msg.content}` }, taskId: msg.taskId });
+            orch.pushUserMessage(`[Task "${task.name}"] User responded: ${msg.content}`, msg.image, msg.taskId);
             broadcastTasks(); break;
           }
           case 'task_archive': taskStore.complete(msg.taskId); broadcastTasks(); break;

@@ -34,6 +34,7 @@ export function createOrchestrator(
   sm: SessionManager,
   taskStore: TaskStore,
   onEvent: (agentId: string, event: AcpEvent) => void,
+  onTaskEvent: (taskId: string, agentId: string, content: string) => void,
   onBroadcastSessions: () => void,
   onBroadcastTasks: () => void,
 ): Orchestrator {
@@ -176,6 +177,18 @@ export function createOrchestrator(
           }
         }
       }
+
+      // After commands: split response by [task:xxx] and broadcast tagged sections
+      const taskSections = response.split(/(?=\[task:[\w-]+\])/);
+      for (const section of taskSections) {
+        const m = section.match(/^\[task:([\w-]+)\]\s*/);
+        if (m) {
+          const taggedTaskId = m[1] === 'latest' ? latestTaskId : m[1];
+          if (taggedTaskId) {
+            onTaskEvent(taggedTaskId, 'master', section.slice(m[0].length).trim());
+          }
+        }
+      }
     } catch (err) {
       if (!aborted) onEvent('system', { type: 'text', content: `❌ Master error: ${(err as Error).message}` });
     }
@@ -188,6 +201,7 @@ export function createOrchestrator(
 
   async function executeWorker(workerId: string, instructions: string, taskId?: string, stageIndex?: number) {
     onEvent(workerId, { type: 'text', content: `📋 Task from Master:\n${instructions}` });
+    if (taskId) onTaskEvent(taskId, workerId, `📋 Task from Master:\n${instructions}`);
     onBroadcastSessions();
     try {
       const result = await sm.sendPrompt(workerId, instructions, onEvent);
@@ -198,6 +212,8 @@ export function createOrchestrator(
       if (taskId && stageIndex !== undefined) {
         taskStore.updateStage(taskId, stageIndex, 'done', summarize(result));
         onBroadcastTasks();
+        // Send worker result to task view
+        onTaskEvent(taskId, workerId, result.length > 1000 ? summarize(result) : result);
       }
 
       // Save long results to wiki
