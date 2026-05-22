@@ -48,12 +48,14 @@ export function createOrchestrator(
 
   // Heartbeat: periodic check for stuck/missed dispatches
   const HEARTBEAT_INTERVAL = 5 * 60 * 1000;
+  let heartbeatCooldownUntil = 0;
   setInterval(() => {
+    if (Date.now() < heartbeatCooldownUntil) return; // cooldown after error
     const master = sm.get('master');
     if (!master || master.status !== 'idle' || inbox.length > 0 || processing) return;
     const hasIdleWorker = sm.getAll().some(s => s.config.role === 'worker' && s.status === 'idle');
     const needsAttention = taskStore.getActive().some(t =>
-      t.stages.some(s => {
+      t.status === 'active' && t.stages.some(s => {
         if (s.status === 'pending' && hasIdleWorker) return true;
         if (s.status === 'running' && s.assignedTo) {
           const w = sm.get(s.assignedTo);
@@ -63,6 +65,7 @@ export function createOrchestrator(
       })
     );
     if (needsAttention) {
+      logger.info('Heartbeat triggered');
       inbox.push({ timestamp: now(), from: 'system', summary: 'Heartbeat: pending tasks with idle workers, or running tasks appear stuck. Check and dispatch.' });
       scheduleWake();
     }
@@ -216,7 +219,10 @@ export function createOrchestrator(
         }
       }
     } catch (err) {
-      if (!aborted) onEvent('system', { type: 'text', content: `❌ Master error: ${(err as Error).message}` });
+      if (!aborted) {
+        onEvent('system', { type: 'text', content: `❌ Master error: ${(err as Error).message}` });
+        heartbeatCooldownUntil = Date.now() + 15 * 60 * 1000; // 15 min cooldown after error
+      }
     }
 
     processing = false;

@@ -88,7 +88,7 @@ export function createSessionManager(command: string, args: string[], orchestraD
       if (s.config.persona) {
         let kiroMd = '';
         try { kiroMd = readFileSync(resolve(wikisRoot, '..', 'KIRO.md'), 'utf-8'); } catch { /* optional */ }
-        const initPrompt = `${s.config.persona}\n\n---\n\n${kiroMd ? `## Shared Guidelines (KIRO.md)\n\n${kiroMd}\n\n---\n\n` : ''}Your wiki directory: ${s.wikiDir}\nWorking directory: ${s.config.cwd}\n\nConfirm your role in one sentence.`;
+        const initPrompt = `${s.config.persona}\n\n---\n\n${kiroMd ? `## Shared Guidelines (KIRO.md)\n\n${kiroMd}\n\n---\n\n` : ''}Your wiki directory: ${s.wikiDir}\nWorking directory: ${s.config.cwd}\nOrchestra directory: ${resolve(wikisRoot, '..')}\n\nConfirm your role in one sentence.`;
         let confirmation = '';
         await backend.sendPrompt([{ type: 'text', text: initPrompt }], (ev) => { if (ev.type === 'text') confirmation += ev.content; });
         if (confirmation) logger.info(`Persona confirmed: ${s.config.name}`, { response: confirmation.slice(0, 100) });

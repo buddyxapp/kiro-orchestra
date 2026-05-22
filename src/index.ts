@@ -57,7 +57,8 @@ Actions mean: reply=send email reply, skip=ignore, close=close SFDC opp, forward
 Create a task for the batch, then dispatch workers to handle each item.
 
 HTML Report Generation:
-When producing HTML reports with actionable items, follow the template at http://localhost:3000/report-template.html
+When producing HTML reports with actionable items, read the template file first for the correct structure.
+Template location: find report-template.html in the kiro-orchestra/public/ directory (use glob or search if needed).
 Key rules:
 - Each item: <div class="card" data-id="N"> with .main-cb checkbox and .act-cb action checkboxes
 - data-subject attribute = item description, data-action = action keyword (reply/skip/close/forward/task/track)

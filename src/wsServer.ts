@@ -47,8 +47,11 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
         try {
           const { content } = JSON.parse(body);
           if (content) {
-            broadcast({ type: 'agent_event', agentId: 'user', event: { type: 'text', content } });
-            orch.pushUserMessage(content);
+            // Parse task ID from [REPORT_EXEC] header if present
+            const taskMatch = content.match(/\[task:([\w-]+)\]/);
+            const taskId = taskMatch ? taskMatch[1] : undefined;
+            broadcast({ type: 'agent_event', agentId: 'user', event: { type: 'text', content }, taskId });
+            orch.pushUserMessage(content, undefined, taskId);
           }
           res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
           res.end('{"ok":true}');
