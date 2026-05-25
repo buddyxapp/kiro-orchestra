@@ -9,6 +9,7 @@
 <meta charset="UTF-8">
 <meta name="orchestra-report" content="Report Title Here">
 <meta name="orchestra-task" content=""><!-- optional: task ID if this report belongs to a task -->
+<meta name="orchestra-task-id" content="">
 <meta name="orchestra-after-done" content="Update this HTML file: mark completed cards with checked disabled on .main-cb, add style=background:#f5f5f5;opacity:0.7 to .card, append Done to .card-title. Use data-id to locate cards."><!-- customize per report type -->
 <title>Report Title</title>
 <style>
@@ -92,7 +93,9 @@ document.addEventListener('change', function(e) {
       if(acts.length)decisions.push({id:card.dataset.id,subject:cb.dataset.subject||'',action:acts.join('+'),notes:notes?notes.value:''});
     });
     if(!decisions.length){showToast('No items selected');return}
-    var content='[REPORT_EXEC]\n'+decisions.map(function(d){return'#'+d.id+' '+d.subject+' → '+d.action+(d.notes?' ('+d.notes+')':'')}).join('\n');
+    var taskId=(document.querySelector('meta[name="orchestra-task-id"]')||{}).content||'';
+    var header=taskId?'[REPORT_EXEC task:'+taskId+']':'[REPORT_EXEC]';
+    var content=header+'\n'+decisions.map(function(d){return'#'+d.id+' '+d.subject+' → '+d.action+(d.notes?' ('+d.notes+')':'')}).join('\n');
     window.orchestraExecute(content);
   };
   window.orchestraExecuteOne=function(btn){
@@ -104,7 +107,9 @@ document.addEventListener('change', function(e) {
     var id=card.dataset.id;
     var subject=cb.dataset.subject||'';
     var noteVal=notes?notes.value:'';
-    var content='[REPORT_EXEC]\n#'+id+' '+subject+' → '+acts.join('+')+(noteVal?' ('+noteVal+')':'');
+    var taskId=(document.querySelector('meta[name="orchestra-task-id"]')||{}).content||'';
+    var header=taskId?'[REPORT_EXEC task:'+taskId+']':'[REPORT_EXEC]';
+    var content=header+'\n#'+id+' '+subject+' → '+acts.join('+')+(noteVal?' ('+noteVal+')':'');
     window.orchestraExecute(content);
     btn.textContent='✅ 已送出';btn.disabled=true;
     cb.checked=true;
