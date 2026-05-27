@@ -87,6 +87,9 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 .task-icons { padding: 6px 0; display: flex; gap: 10px; font-size: 14px; }
 .task-icons span { cursor: pointer; opacity: 0.5; }
 .task-icons span:hover { opacity: 1; }
+.task-inline-del { opacity: 0; font-size: 14px; cursor: pointer; transition: opacity 0.15s; }
+.task-item:hover .task-inline-del { opacity: 0.5; }
+.task-inline-del:hover { opacity: 1 !important; }
 .task-wait-actions { padding: 4px 0; }
 .task-action-btn { padding: 3px 8px; border: 1px solid #444; border-radius: 3px; background: #222; color: #fff; font-size: 10px; cursor: pointer; margin: 3px 4px 3px 0; }
 .task-action-btn:hover { background: #1164a3; border-color: #1164a3; }
@@ -346,11 +349,12 @@ function renderTaskList() {
     }
   }
   if (archived.length) {
-    const collapsed = active.length > 0;
+    const doneHasSelected = archived.some(t => t.id === selectedTaskId);
+    const collapsed = active.length > 0 && !doneHasSelected;
     html += `<div class="task-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">✓ Done (${archived.length})</div><div style="display:${collapsed ? 'none' : 'block'}">`;
     for (const t of archived) {
       const isSelected = t.id === selectedTaskId;
-      html += `<div class="task-item ${isSelected ? 'active' : ''}" onclick="selectTask('${t.id}')" style="opacity:0.6"><div class="task-name">✓ ${esc(t.name)}</div></div>`;
+      html += `<div class="task-item ${isSelected ? 'active' : ''}" onclick="selectTask('${t.id}')" style="opacity:0.6;display:flex;align-items:center"><div class="task-name" style="flex:1;min-width:0">✓ ${esc(t.name)}</div><span class="task-inline-del" title="Delete" onclick="event.stopPropagation();if(confirm('Delete?'))send({type:'task_delete',taskId:'${t.id}'})">🗑</span></div>`;
       if (isSelected) {
         html += `<div class="task-stages-inline">`;
         (t.stages||[]).forEach((s, i) => {
@@ -358,7 +362,6 @@ function renderTaskList() {
         });
         html += `<div class="task-icons">`;
         html += `<span title="Reopen" onclick="event.stopPropagation();send({type:'task_reopen',taskId:'${t.id}'})">↺</span>`;
-        html += `<span title="Delete" onclick="event.stopPropagation();if(confirm('Delete?'))send({type:'task_delete',taskId:'${t.id}'})">🗑</span>`;
         html += `</div></div>`;
       }
     }
