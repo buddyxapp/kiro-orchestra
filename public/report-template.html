@@ -8,8 +8,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="orchestra-report" content="Report Title Here">
-<meta name="orchestra-task" content=""><!-- optional: task ID if this report belongs to a task -->
-<meta name="orchestra-task-id" content="">
+<!-- ⚠️ REQUIRED: orchestra.js reads "orchestra-task" to include task ID in [REPORT_EXEC] header -->
+<meta name="orchestra-task" content=""><!-- FILL from [orchestra-task-id: xxx] in your prompt context -->
+<meta name="orchestra-task-id" content=""><!-- same value as orchestra-task -->
 <meta name="orchestra-after-done" content="Update this HTML file: mark completed cards with checked disabled on .main-cb, add style=background:#f5f5f5;opacity:0.7 to .card, append Done to .card-title. Use data-id to locate cards."><!-- customize per report type -->
 <title>Report Title</title>
 <style>

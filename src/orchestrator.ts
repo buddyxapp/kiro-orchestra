@@ -236,7 +236,8 @@ export function createOrchestrator(
     if (taskId) onTaskEvent(taskId, workerId, `📋 Task from Master:\n${instructions}`);
     onBroadcastSessions();
     try {
-      const result = await sm.sendPrompt(workerId, instructions, onEvent);
+      const prompt = taskId ? `[orchestra-task-id: ${taskId}]\n${instructions}` : instructions;
+      const result = await sm.sendPrompt(workerId, prompt, onEvent);
       const worker = sm.get(workerId);
       const name = worker?.config.name ?? workerId;
 
