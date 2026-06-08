@@ -132,7 +132,8 @@ export function createOrchestrator(
         }).join('\n')
       : '(none)';
 
-    const prompt = `[Active Tasks]\n${taskLines}\n\n[Worker Status]\n${statusLines}\n\n[New Events - ${events.length}]\n${eventLines}\n\n[Rules]\n1. Reply to user: write directly\n2. Multi-step work: TASK_CREATE name: <name>\\nSTAGE: <s1>\\nSTAGE: <s2>\n3. Dispatch for task: DISPATCH worker-id [task:<id>, stage:<N>]: instructions\n4. Stage needs user input: TASK_WAIT <task-id>: reason [BUTTON1] [BUTTON2]\n5. Stage done: TASK_UPDATE <task-id>: stage <N> → done\n6. All stages done: TASK_DONE <task-id>\n7. Simple one-shot (no task): DISPATCH worker-id: instructions\n8. All done: end with DONE\n9. Use [task:latest] to reference a task you just created in this response.`;
+    const wikiDir = sm.get('master')?.wikiDir || '';
+    const prompt = `[Active Tasks]\n${taskLines}\n\n[Worker Status]\n${statusLines}\n\n[New Events - ${events.length}]\n${eventLines}\n\n[Rules]\n1. Reply to user: write directly\n2. Multi-step work: TASK_CREATE name: <name>\\nSTAGE: <s1>\\nSTAGE: <s2>\n3. Dispatch for task: DISPATCH worker-id [task:<id>, stage:<N>]: instructions\n4. Stage needs user input: TASK_WAIT <task-id>: reason [BUTTON1] [BUTTON2]\n5. Stage done: TASK_UPDATE <task-id>: stage <N> → done\n6. All stages done: TASK_DONE <task-id>\n7. Simple one-shot (no task): DISPATCH worker-id: instructions\n8. All done: end with DONE\n9. Use [task:latest] to reference a task you just created in this response.\n10. If you need context from earlier work, read ${wikiDir}/handoff.md or files in ${wikiDir}/reports/`;
 
     try {
       const response = await sm.sendPrompt('master', prompt, onEvent, images.length ? images : undefined);

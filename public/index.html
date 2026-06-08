@@ -37,8 +37,8 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
 .input-area { padding: 10px 20px; border-top: 1px solid #333; position: relative; }
 .input-area .target-hint { font-size: 11px; color: #888; margin-bottom: 4px; }
 .input-area form { display: flex; gap: 8px; }
-.input-area input { flex: 1; background: #222529; border: 1px solid #444; border-radius: 6px; padding: 10px 14px; color: #fff; font-size: 13px; outline: none; }
-.input-area input:focus { border-color: #1164a3; }
+.input-area textarea { flex: 1; background: #222529; border: 1px solid #444; border-radius: 6px; padding: 10px 14px; color: #fff; font-size: 13px; outline: none; resize: none; font-family: inherit; line-height: 1.4; max-height: 120px; overflow-y: auto; }
+.input-area textarea:focus { border-color: #1164a3; }
 .input-area button { background: #1164a3; color: #fff; border: none; border-radius: 6px; padding: 10px 14px; cursor: pointer; font-size: 13px; }
 .stop-btn { background: #e74c3c !important; font-size: 16px !important; padding: 10px 12px !important; }
 .stop-btn:disabled { cursor: not-allowed; }
@@ -149,7 +149,7 @@ body { font-family: 'Segoe UI', sans-serif; background: #1a1d21; color: #d1d2d3;
     <div class="mention-popup" id="mention-popup"></div>
     <div class="image-preview" id="image-preview"></div>
     <form id="form">
-      <input id="input" placeholder="Type a message... (Ctrl+V to paste image)" autocomplete="off" />
+      <textarea id="input" placeholder="Type a message... (Shift+Enter for newline, Ctrl+V to paste image)" autocomplete="off" rows="1"></textarea>
       <label class="img-btn" title="Attach image">📎<input type="file" id="file-input" accept="image/*" style="display:none"></label>
       <button type="submit">Send</button>
       <button type="button" id="btn-stop-all" class="stop-btn" title="Stop all agents" disabled onclick="send({type:'user_message',content:'stop'})">⏹</button>
@@ -186,6 +186,8 @@ const mentionPopup = document.getElementById('mention-popup');
 
 let ws, sessions = [], activeChannel = 'all', showSettings = false;
 const logs = { all: [] };
+const MAX_LOGS = 150;
+const MAX_TASK_LOGS = 100;
 let workerCounter = 5;
 let mentionIdx = -1;
 const streaming = {};
@@ -195,6 +197,7 @@ let mode = 'chat'; // 'chat' or 'tasks'
 let tasks = [];
 let selectedTaskId = null;
 const taskLogs = {}; // { taskId: [entries] }
+function capPush(arr, item, max) { arr.push(item); if (arr.length > max) arr.shift(); }
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}`);
@@ -214,7 +217,7 @@ function handleEvent(agentId, event, taskId) {
   // Store in taskLogs if tagged — don't duplicate in main chat
   if (taskId && event.type === 'text') {
     if (!taskLogs[taskId]) taskLogs[taskId] = [];
-    taskLogs[taskId].push({ agentId, event });
+    capPush(taskLogs[taskId], { agentId, event }, MAX_TASK_LOGS);
     if (mode === 'tasks' && selectedTaskId === taskId) renderTaskMessages();
     // User messages still show in #all; Master/Worker task-tagged messages don't (streaming already showed them)
     if (agentId !== 'user') return;
@@ -240,7 +243,7 @@ function handleEvent(agentId, event, taskId) {
     streaming[agentId] = null;
     renderActivity();
     const entry = { agentId, event };
-    logs.all.push(entry); logs[agentId].push(entry);
+    capPush(logs.all, entry, MAX_LOGS); capPush(logs[agentId], entry, MAX_LOGS);
     if (!showSettings && mode === 'chat') renderMessages();
     return;
   }
@@ -249,9 +252,9 @@ function handleEvent(agentId, event, taskId) {
   if (event.type === 'text') {
     if (agentId === 'user' || agentId === 'system') {
       const entry = { agentId, event };
-      logs.all.push(entry);
+      capPush(logs.all, entry, MAX_LOGS);
       if (!logs[agentId]) logs[agentId] = [];
-      logs[agentId].push(entry);
+      capPush(logs[agentId], entry, MAX_LOGS);
       // Add to target agent's log (parse @mention or use active channel)
       let targetId = activeChannel !== 'all' ? activeChannel : 'master';
       if (agentId === 'user' && event.content?.startsWith('@')) {
@@ -260,12 +263,12 @@ function handleEvent(agentId, event, taskId) {
       }
       if (targetId !== 'all' && targetId !== agentId) {
         if (!logs[targetId]) logs[targetId] = [];
-        logs[targetId].push(entry);
+        capPush(logs[targetId], entry, MAX_LOGS);
       }
     } else {
       if (!streaming[agentId]) {
         const entry = { agentId, event: { type: 'text', content: event.content } };
-        logs.all.push(entry); logs[agentId].push(entry);
+        capPush(logs.all, entry, MAX_LOGS); capPush(logs[agentId], entry, MAX_LOGS);
         streaming[agentId] = entry;
       } else {
         streaming[agentId].event.content += event.content;
@@ -273,7 +276,7 @@ function handleEvent(agentId, event, taskId) {
     }
   } else {
     const entry = { agentId, event };
-    logs.all.push(entry); logs[agentId].push(entry);
+    capPush(logs.all, entry, MAX_LOGS); capPush(logs[agentId], entry, MAX_LOGS);
   }
   if (!showSettings && mode === 'chat') renderMessages();
 }
@@ -576,6 +579,12 @@ fileInput.onchange = (e) => { if (e.target.files[0]) loadImage(e.target.files[0]
 function loadImage(file) { if (!file) return; const r = new FileReader(); r.onload = () => { pendingImage = { media_type: file.type, data: r.result.split(',')[1] }; imagePreview.innerHTML = `<img src="${r.result}"><span class="remove-img" onclick="clearImage()">✕</span>`; }; r.readAsDataURL(file); }
 function clearImage() { pendingImage = null; imagePreview.innerHTML = ''; }
 
+// --- Textarea: Enter to send, Shift+Enter for newline, auto-resize ---
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+});
+input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 120) + 'px'; });
+
 // --- Form submit ---
 form.onsubmit = (e) => {
   e.preventDefault();
@@ -585,12 +594,12 @@ form.onsubmit = (e) => {
   // Task mode: send as task_respond
   if (mode === 'tasks' && selectedTaskId) {
     send({ type: 'task_respond', taskId: selectedTaskId, content: text || '(image)', image: pendingImage });
-    input.value = ''; clearImage(); return;
+    input.value = ''; input.style.height = 'auto'; clearImage(); return;
   }
 
   if (activeChannel !== 'all' && text && !text.startsWith('@')) { const a = sessions.find(s => s.id === activeChannel); if (a) text = `@${a.name} ${text}`; }
   send({ type: 'user_message', content: text || '(image)', image: pendingImage });
-  input.value = ''; clearImage(); mentionPopup.classList.remove('show');
+  input.value = ''; input.style.height = 'auto'; clearImage(); mentionPopup.classList.remove('show');
 };
 
 document.getElementById('btn-settings').onclick = () => { showSettings = !showSettings; toggleView(); if (showSettings) renderSettings(); };

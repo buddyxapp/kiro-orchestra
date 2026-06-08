@@ -2,7 +2,7 @@
  * WebSocket + HTTP server — serves UI, routes messages via orchestrator.
  */
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { type AcpEvent } from './acpProtocol.js';
@@ -79,8 +79,15 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
 
   const wss = new WebSocketServer({ server, maxPayload: 10 * 1024 * 1024 }); // 10MB limit
   const clients = new Set<WebSocket>();
-  const MAX_HISTORY = 2000;
+  const MAX_HISTORY = 500;
   const history: ServerMsg[] = [];
+  const transcriptDir = resolve(publicDir, '..', 'wikis', 'transcripts');
+  mkdirSync(transcriptDir, { recursive: true });
+
+  function evictToTranscript(msg: ServerMsg) {
+    const file = resolve(transcriptDir, `${new Date().toISOString().slice(0, 10)}.jsonl`);
+    try { appendFileSync(file, JSON.stringify(msg) + '\n'); } catch { /* best effort */ }
+  }
 
   function broadcast(msg: ServerMsg) {
     const data = JSON.stringify(msg);
@@ -89,7 +96,7 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
       // Strip image data from history to prevent memory bloat
       const stored = ('image' in msg.event && msg.event.image) ? { ...msg, event: { ...msg.event, image: undefined } } as ServerMsg : msg;
       history.push(stored);
-      if (history.length > MAX_HISTORY) history.shift();
+      if (history.length > MAX_HISTORY) evictToTranscript(history.shift()!);
     }
   }
 
@@ -111,7 +118,7 @@ export function startServer(port: number, sm: SessionManager, workspace: string)
     for (const ws of clients) if (ws.readyState === ws.OPEN) ws.send(data);
     // Store in history for replay on refresh
     history.push(msg);
-    if (history.length > MAX_HISTORY) history.shift();
+    if (history.length > MAX_HISTORY) evictToTranscript(history.shift()!);
   }
 
   const orch = createOrchestrator(sm, taskStore, onEvent, onTaskEvent, broadcastSessions, broadcastTasks);

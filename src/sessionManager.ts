@@ -22,7 +22,12 @@ export interface AgentSession {
   status: 'stopped' | 'starting' | 'idle' | 'working';
   wikiDir: string;
   configOptions: Array<{ id: string; name: string; currentValue: string; options: Array<{ value: string; name: string }> }>;
+  turnCount: number;
+  rotatingPromise: Promise<void> | null;
 }
+
+const MAX_TURNS_MASTER = 100;
+const MAX_TURNS_WORKER = 1;  // Workers are stateless — reset after every task
 
 export interface SessionManager {
   getAll(): AgentSession[];
@@ -42,6 +47,38 @@ export function createSessionManager(command: string, args: string[], orchestraD
   const sessions = new Map<string, AgentSession>();
   const wikisRoot = resolve(orchestraDir, 'wikis');
 
+  async function rotateSession(s: AgentSession, onEvent: (agentId: string, event: AcpEvent) => void) {
+    const id = s.config.id;
+    logger.info(`Rotation triggered for ${s.config.name} (${id}) after ${s.turnCount} turns`);
+    s.backend?.stop();
+    s.backend = null;
+    s.status = 'stopped';
+    s.turnCount = 0;
+    const agentArgs = s.config.model && s.config.model !== 'auto'
+      ? [...args, '--model', s.config.model]
+      : args;
+    const backend = createAcpBackend(command, agentArgs, s.config.cwd);
+    await backend.start();
+    await backend.sessionNew(s.config.cwd);
+    s.backend = backend;
+    s.configOptions = backend.getConfigOptions();
+    backend.onClose((code) => {
+      if (s.backend === backend) { s.backend = null; s.status = 'stopped'; }
+    });
+    // Workers: no persona re-init needed (stateless, next dispatch carries full instructions)
+    // Master: re-init with persona + handoff reference
+    if (s.config.role === 'master') {
+      let kiroMd = '';
+      try { kiroMd = readFileSync(resolve(wikisRoot, '..', 'KIRO.md'), 'utf-8'); } catch { /* optional */ }
+      const handoffNote = `\n\nYou were just rotated for performance. Read ${s.wikiDir}/handoff.md for context from your previous session.`;
+      const initPrompt = `${s.config.persona}\n\n---\n\n${kiroMd ? `## Shared Guidelines (KIRO.md)\n\n${kiroMd}\n\n---\n\n` : ''}Your wiki directory: ${s.wikiDir}\nWorking directory: ${s.config.cwd}\nOrchestra directory: ${resolve(wikisRoot, '..')}${handoffNote}\n\nConfirm your role in one sentence.`;
+      await backend.sendPrompt([{ type: 'text', text: initPrompt }], () => {});
+      onEvent('system', { type: 'text', content: `🔄 ${s.config.name} rotated (session refreshed)` });
+    }
+    s.status = 'idle';
+    logger.info(`Rotation complete: ${s.config.name} (${id})`);
+  }
+
   return {
     getAll: () => [...sessions.values()],
     get: (id) => sessions.get(id),
@@ -49,7 +86,7 @@ export function createSessionManager(command: string, args: string[], orchestraD
     addAgent(config: AgentConfig) {
       const wikiDir = resolve(wikisRoot, config.id);
       mkdirSync(wikiDir, { recursive: true });
-      sessions.set(config.id, { config, backend: null, status: 'stopped', wikiDir, configOptions: [] });
+      sessions.set(config.id, { config, backend: null, status: 'stopped', wikiDir, configOptions: [], turnCount: 0, rotatingPromise: null });
     },
 
     removeAgent(id: string) {
@@ -123,7 +160,10 @@ export function createSessionManager(command: string, args: string[], orchestraD
 
     async sendPrompt(id: string, text: string, onEvent, images?: Array<{ media_type: string; data: string }>) {
       const s = sessions.get(id);
-      if (!s?.backend) throw new Error(`Agent ${id} not running`);
+      if (!s) throw new Error(`Agent ${id} not found`);
+      // Wait for any in-progress rotation to finish
+      if (s.rotatingPromise) await s.rotatingPromise;
+      if (!s.backend) throw new Error(`Agent ${id} not running`);
       s.status = 'working';
       const content: ContentBlock[] = [];
       if (images && images.length) {
@@ -143,6 +183,26 @@ export function createSessionManager(command: string, args: string[], orchestraD
       }
       try {
         const result = await s.backend.sendPrompt(content, (ev) => onEvent(id, ev));
+        s.turnCount++;
+        // Auto-save handoff context after every turn (survives unexpected interrupts)
+        if (s.config.role === 'master') {
+          try {
+            const handoffPath = resolve(s.wikiDir, 'handoff.md');
+            const entry = `\n## Turn ${s.turnCount} (${new Date().toISOString().slice(0, 19)})\n**Prompt:** ${text.slice(0, 500)}\n**Response:** ${result.slice(0, 800)}\n`;
+            let existing = '';
+            try { existing = readFileSync(handoffPath, 'utf-8'); } catch { /* first time */ }
+            // Keep only last ~20 entries to avoid handoff.md itself becoming huge
+            const lines = (existing + entry).split('\n## Turn ');
+            const trimmed = lines.length > 21 ? '## Turn ' + lines.slice(-20).join('\n## Turn ') : existing + entry;
+            writeFileSync(handoffPath, trimmed.startsWith('## Turn') ? trimmed : `# Master Handoff Log\n${trimmed}`);
+          } catch { /* best effort */ }
+        }
+        // Check if rotation needed — await it so next sendPrompt sees a ready session
+        const maxTurns = s.config.role === 'master' ? MAX_TURNS_MASTER : MAX_TURNS_WORKER;
+        if (s.turnCount >= maxTurns) {
+          s.rotatingPromise = rotateSession(s, onEvent).catch(err => logger.error('Rotation failed', { id, error: (err as Error).message })).finally(() => { s.rotatingPromise = null; });
+          await s.rotatingPromise;
+        }
         return result;
       } finally {
         if (s.backend?.isAlive()) s.status = 'idle';
