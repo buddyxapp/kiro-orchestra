@@ -616,6 +616,14 @@ function linkify(s) {
   });
   // Plain URLs (http, https, file)
   out = out.replace(/(?<!["=])((?:https?|file):\/\/[^\s<"']+)/g, '<a href="$1" target="_blank" style="color:#58a6ff;">$1</a>');
+  // Relative file paths (e.g. folder/file.html) — convert to file:// links using workspace root
+  const cwd = (sessions && sessions[0]?.cwd) || '';
+  if (cwd) {
+    out = out.replace(/(?<!["=\/a-zA-Z])((?:[\w.@-]+\/)+[\w.-]+\.(?:html|md|pdf|xlsx|pptx|docx|csv|json))\b/g, (_, p) => {
+      const abs = 'file:///' + cwd.replace(/\\/g, '/').replace(/\/$/, '') + '/' + p;
+      return `<a href="${abs}" target="_blank" style="color:#58a6ff;">${p}</a>`;
+    });
+  }
   // Markdown formatting
   out = out.replace(/^### (.+)$/gm, '<strong style="font-size:14px;color:#fff;">$1</strong>');
   out = out.replace(/^## (.+)$/gm, '<strong style="font-size:15px;color:#fff;">$1</strong>');
